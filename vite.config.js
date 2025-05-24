@@ -6,11 +6,11 @@ export default defineConfig({
   plugins: [vue()],
   clearScreen: false,
   server: {
-    port: 5173,
+    port: 5176,
     strictPort: true,
     host: '0.0.0.0',
     hmr: {
-      port: 5174,
+      port: 5177,
     },
   },
   envPrefix: ['VITE_', 'TAURI_'],

@@ -2,6 +2,7 @@
 name = "ai-review"
 version = "0.1.0"
 edition = "2021"
+default-run = "ai-review-ui"
 
 [[bin]]
 name = "ai-review-ui"
@@ -12,18 +13,10 @@ name = "ai-review-cli"
 path = "src/cli.rs"
 
 [dependencies]
-tauri = { version = "1.0", features = [
-  "shell-open",
-  "window-close",
-  "window-hide",
-  "window-maximize",
-  "window-minimize",
-  "window-set-focus",
-  "window-show",
-  "window-start-dragging",
-  "window-unmaximize",
-  "window-unminimize",
-  "notification-all"
+tauri = { version = "2.0", features = [
+  "tray-icon",
+  "image-ico",
+  "image-png"
 ] }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
@@ -36,8 +29,7 @@ interprocess = "1.2"
 notify-rust = "4.0"
 
 [build-dependencies]
-tauri-build = { version = "1.0", features = [] }
+tauri-build = { version = "2.0", features = [] }
 
 [features]
-default = [ "custom-protocol" ]
-custom-protocol = [ "tauri/custom-protocol" ]
+default = []

@@ -96,16 +96,11 @@ impl IpcServer {
         loop {
             match self.listener.accept() {
                 Ok(stream) => {
-                    println!("🔗 新客户端已连接");
                     let sender = self.message_sender.clone();
 
-                    // 暂时使用同步处理来调试
-                    println!("🚀 开始处理客户端");
                     tokio::task::spawn_blocking(move || {
                         if let Err(e) = handle_client_with_timeout(stream, sender) {
                             eprintln!("❌ 处理客户端时出错: {}", e);
-                        } else {
-                            println!("✅ 客户端处理成功");
                         }
                     });
                 }
@@ -121,34 +116,28 @@ fn handle_client_with_timeout(
     mut stream: LocalSocketStream,
     message_sender: tokio_mpsc::UnboundedSender<(Message, mpsc::Sender<String>)>,
 ) -> Result<()> {
-    println!("🔧 处理客户端连接");
     // 读取消息
     let mut buffer = [0; 4096];
     let bytes_read = stream.read(&mut buffer)?;
     let received_data = String::from_utf8_lossy(&buffer[..bytes_read]);
-    println!("🔍 收到 {} 字节数据: {}", bytes_read, received_data);
 
     // 查找第一个换行符
     if let Some(newline_pos) = received_data.find('\n') {
         let line = &received_data[..newline_pos];
-        println!("🔍 解析行: {}", line);
         let message: Message = serde_json::from_str(line.trim())?;
-        println!("🔍 解析消息: {:?}", message);
 
         // 创建响应通道
         let (response_tx, response_rx) = mpsc::channel();
 
         // 发送消息到UI
-        println!("🔍 发送消息到UI处理程序");
         if let Err(e) = message_sender.send((message.clone(), response_tx)) {
             eprintln!("❌ 发送消息到UI处理程序失败: {}", e);
             return Err(anyhow::anyhow!("❌ 发送消息到UI处理程序失败"));
         }
-        println!("✅ 消息已成功发送给UI处理程序");
 
         // 使用消息中指定的超时时间，默认30秒
         let timeout_secs = message.timeout.unwrap_or(30);
-        
+
         // 等待UI响应 (使用自定义超时)
         match response_rx.recv_timeout(Duration::from_secs(timeout_secs)) {
             Ok(user_response) => {
@@ -172,13 +161,13 @@ async fn handle_client_with_timeout_async(
     message_sender: tokio_mpsc::UnboundedSender<(Message, mpsc::Sender<String>)>,
 ) -> Result<()> {
     println!("🔄 正在处理客户端连接");
-    
+
     // 读取消息 - 使用阻塞IO但在异步任务中运行
     let mut buffer = [0; 4096];
     let read_result = tokio::task::spawn_blocking(move || {
         stream.read(&mut buffer).map(|n| (n, buffer, stream))
     }).await??;
-    
+
     let (bytes_read, buffer, mut stream) = read_result;
     let received_data = String::from_utf8_lossy(&buffer[..bytes_read]);
     println!("📨 接收到 {} 字节数据: {}", bytes_read, received_data);
@@ -204,14 +193,14 @@ async fn handle_client_with_timeout_async(
         // 使用消息中指定的超时时间，默认30秒
         let timeout_secs = message.timeout.unwrap_or(30);
         println!("⏰ 等待UI响应，超时时间: {}秒", timeout_secs);
-        
+
         // 等待UI响应 (使用自定义超时)
         match response_rx.recv_timeout(Duration::from_secs(timeout_secs)) {
             Ok(user_response) => {
                 println!("✅ 收到用户响应: {}", user_response);
                 let response = Message::new_response(message.id, user_response);
                 let response_json = serde_json::to_string(&response)?;
-                
+
                 // 异步写入响应
                 tokio::task::spawn_blocking(move || {
                     writeln!(stream, "{}", response_json)
@@ -222,7 +211,7 @@ async fn handle_client_with_timeout_async(
                 println!("⏰ 等待响应超时");
                 let error = Message::new_error(message.id, format!("超时未收到回复 ({}秒)", timeout_secs));
                 let error_json = serde_json::to_string(&error)?;
-                
+
                 // 异步写入错误响应
                 tokio::task::spawn_blocking(move || {
                     writeln!(stream, "{}", error_json)
@@ -260,7 +249,7 @@ impl IpcClient {
         if let Some(newline_pos) = received_data.find('\n') {
             let line = &received_data[..newline_pos];
             let response: Message = serde_json::from_str(line.trim())?;
-            
+
             // 检查是否是错误响应
             match response.message_type {
                 MessageType::Error => Err(anyhow::anyhow!("{}", response.content)),

@@ -1,57 +1,17 @@
 {
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "AI Review",
+  "version": "0.1.0",
+  "identifier": "com.imhuso.ai-review",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:5173",
-    "distDir": "./dist",
-    "withGlobalTauri": false
+    "frontendDist": "./dist",
+    "devUrl": "http://localhost:5176"
   },
-  "package": {
-    "productName": "AI Review",
-    "version": "0.1.0"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "shell": {
-        "all": false,
-        "open": true
-      },
-      "window": {
-        "all": false,
-        "close": true,
-        "hide": true,
-        "show": true,
-        "maximize": true,
-        "minimize": true,
-        "unmaximize": true,
-        "unminimize": true,
-        "startDragging": true,
-        "setFocus": true
-      },
-      "notification": {
-        "all": true
-      }
-    },
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "com.ai-review.app",
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ]
-    },
-    "security": {
-      "csp": null
-    },
+  "app": {
     "windows": [
       {
-        "fullscreen": false,
-        "resizable": true,
         "title": "AI Review",
         "width": 800,
         "height": 600,
@@ -59,10 +19,56 @@
         "minHeight": 400,
         "center": true,
         "visible": true,
-        "alwaysOnTop": true,
-        "decorations": false,
-        "transparent": false
+        "alwaysOnTop": false,
+        "decorations": true,
+        "hiddenTitle": true,
+        "transparent": false,
+        "resizable": true,
+        "fullscreen": false
       }
-    ]
+    ],
+    "security": {
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "description": "Main window capabilities",
+          "windows": ["main"],
+          "permissions": [
+            "core:event:allow-listen",
+            "core:event:allow-emit",
+            "core:window:allow-show",
+            "core:window:allow-hide",
+            "core:window:allow-close",
+            "core:window:allow-minimize",
+            "core:window:allow-set-focus",
+            "core:window:allow-set-always-on-top"
+          ]
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "app"],
+    "icon": [],
+    "resources": [
+      "scripts/postinstall.sh"
+    ],
+    "externalBin": [
+      "target/release/ai-review-cli"
+    ],
+    "copyright": "",
+    "category": "DeveloperTool",
+    "shortDescription": "AI Review Tool",
+    "longDescription": "AI Review Tool for code analysis and review",
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "providerShortName": null,
+      "entitlements": null
+    }
   }
 }

@@ -1,23 +1,23 @@
 <script setup>
 import {
-  ClockCircleOutlined,
-  CloseOutlined,
-  MessageOutlined,
-  MinusOutlined,
   RobotOutlined,
+  SettingOutlined,
 } from '@ant-design/icons-vue'
 import { listen } from '@tauri-apps/api/event'
-import { invoke } from '@tauri-apps/api/tauri'
-import { appWindow } from '@tauri-apps/api/window'
+import { invoke } from '@tauri-apps/api/core'
 import { nextTick, onMounted, ref } from 'vue'
 import RequestHandler from './components/RequestHandler.vue'
+import SettingsModal from './components/SettingsModal.vue'
 
 // 响应式数据
 const appInfo = ref('')
 const currentRequest = ref(null)
 const isConnected = ref(false)
 const chatHistory = ref([])
-const chatHistoryRef = ref(null)
+const showSettings = ref(false)
+const replyText = ref('')
+const inputFocused = ref(false)
+const messagesContainer = ref(null)
 
 // 聊天历史管理（限制数量以优化性能）
 const MAX_HISTORY_ITEMS = 100
@@ -39,8 +39,8 @@ function addToHistory(type, content, id = null) {
 
   // 滚动到底部
   nextTick(() => {
-    if (chatHistoryRef.value) {
-      chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
     }
   })
 }
@@ -53,22 +53,19 @@ function formatTime(date) {
   })
 }
 
-// 窗口控制
-async function minimizeWindow() {
-  try {
-    await appWindow.minimize()
-  }
-  catch (error) {
-    console.error('最小化窗口失败:', error)
-  }
-}
 
-async function closeWindow() {
+
+// 检查IPC连接状态
+async function checkConnectionStatus() {
   try {
-    await appWindow.close()
+    const status = await invoke('check_ipc_status')
+    isConnected.value = status
+    return status
   }
   catch (error) {
-    console.error('关闭窗口失败:', error)
+    console.error('❌ 检查IPC状态失败:', error)
+    isConnected.value = false
+    return false
   }
 }
 
@@ -103,12 +100,16 @@ onMounted(async () => {
       console.warn('📨 currentRequest已更新:', currentRequest.value)
     })
     console.warn('✅ 事件监听器设置成功')
-    isConnected.value = true
   }
   catch (error) {
     console.error('❌ 设置事件监听器失败:', error)
-    isConnected.value = false
   }
+
+  // 初始检查连接状态
+  await checkConnectionStatus()
+
+  // 定期检查连接状态（每5秒）
+  setInterval(checkConnectionStatus, 5000)
 })
 
 // 处理用户回复
@@ -121,7 +122,7 @@ async function handleResponse(response) {
     addToHistory('outgoing', response)
 
     await invoke('respond_to_request', {
-      id: currentRequest.value.id,
+      requestId: currentRequest.value.id,
       response,
     })
     console.warn('✅ 回复发送成功:', response)
@@ -143,7 +144,7 @@ async function handleCancel() {
     addToHistory('outgoing', '[已取消]')
 
     await invoke('respond_to_request', {
-      id: currentRequest.value.id,
+      requestId: currentRequest.value.id,
       response: '[用户取消了请求]',
     })
     console.warn('✅ 请求已取消')
@@ -153,12 +154,70 @@ async function handleCancel() {
     console.error('❌ 取消请求失败:', error)
   }
 }
+
+// 打开设置弹窗
+function openSettings() {
+  showSettings.value = true
+}
+
+// 关闭设置弹窗
+function closeSettings() {
+  showSettings.value = false
+}
+
+// 输入框焦点处理
+function onInputFocus() {
+  inputFocused.value = true
+}
+
+function onInputBlur() {
+  inputFocused.value = false
+}
+
+// 键盘事件处理
+function handleEnterKey(event) {
+  // 普通Enter键只是换行，不发送
+  // 不阻止默认行为，允许换行
+}
+
+function handleCmdEnter(event) {
+  // CMD+Enter 发送消息
+  event.preventDefault()
+  sendReply()
+}
+
+// 发送回复
+async function sendReply() {
+  if (!currentRequest.value || !replyText.value.trim()) {
+    return
+  }
+
+  try {
+    const response = await invoke('respond_to_request', {
+      requestId: currentRequest.value.id,
+      response: replyText.value.trim(),
+    })
+
+    // 清空输入框
+    replyText.value = ''
+
+    // 清除当前请求
+    currentRequest.value = null
+
+    console.warn('✅ 回复发送成功:', response)
+  }
+  catch (error) {
+    console.error('❌ 发送回复失败:', error)
+  }
+}
+
+
 </script>
 
 <template>
   <div class="app-container">
-    <!-- 窗口标题栏 -->
-    <div class="title-bar window-drag-region">
+    <!-- 自定义标题栏 -->
+    <div class="title-bar" data-tauri-drag-region>
       <div class="title-content">
         <div class="app-title">
           <RobotOutlined class="app-icon" />
@@ -166,88 +225,71 @@ async function handleCancel() {
         </div>
         <div class="status-indicator">
           <a-badge
-            :status="isConnected ? 'processing' : 'error'"
+            :status="isConnected ? 'success' : 'error'"
             :text="isConnected ? '已连接' : '连接中...'"
             class="status-badge"
           />
         </div>
       </div>
-      <div class="window-controls window-no-drag">
+      <div class="toolbar">
         <a-button
           type="text"
           size="small"
-          class="control-btn minimize"
-          @click="minimizeWindow"
+          @click="openSettings"
+          title="设置"
         >
-          <MinusOutlined />
-        </a-button>
-        <a-button
-          type="text"
-          size="small"
-          class="control-btn close"
-          @click="closeWindow"
-        >
-          <CloseOutlined />
+          <SettingOutlined />
         </a-button>
       </div>
     </div>
 
-    <!-- 主要内容区域 -->
-    <div class="main-content">
-      <!-- 聊天历史区域 -->
-      <div ref="chatHistoryRef" class="chat-history">
-        <a-empty
-          v-if="chatHistory.length === 0"
-          class="empty-state"
-          description="暂无聊天记录"
-        >
-          <template #image>
-            <MessageOutlined class="empty-icon" />
-          </template>
-          <template #description>
-            <span class="empty-description">
-              暂无聊天记录<br />
-              <small>等待命令行消息...</small>
-            </span>
-          </template>
-        </a-empty>
+    <!-- 聊天主界面 -->
+    <div class="chat-container">
+      <!-- 聊天消息区域 -->
+      <div class="chat-messages" ref="messagesContainer">
+        <!-- 欢迎消息 -->
+        <div v-if="chatHistory.length === 0" class="welcome-message">
+          <div class="welcome-content">
+            <RobotOutlined class="welcome-icon" />
+            <h3>AI Review 助手</h3>
+            <p>{{ appInfo }}</p>
+            <p class="status-text">
+              等待命令行消息...
+            </p>
+          </div>
+        </div>
 
-        <div v-else class="messages">
-          <div
-            v-for="message in chatHistory"
-            :key="message.id"
-            class="message-item fade-in-up"
-            :class="message.type"
-          >
-            <a-card
-              :bordered="false"
-              size="small"
-              class="message-card"
-              :class="`message-${message.type}`"
-            >
-              <div class="message-content">
-                <div class="message-text">
-                  {{ message.content }}
-                </div>
-                <div class="message-time">
-                  <ClockCircleOutlined class="time-icon" />
-                  {{ formatTime(message.timestamp) }}
-                </div>
-              </div>
-            </a-card>
+        <!-- 聊天消息列表 -->
+        <div v-for="item in chatHistory" :key="item.id" class="message-item" :class="item.type">
+          <div class="message-bubble">
+            <div class="message-content">{{ item.content }}</div>
+            <div class="message-time">{{ formatTime(item.timestamp) }}</div>
           </div>
         </div>
       </div>
 
-      <!-- 当前请求处理区域 -->
-      <div v-if="currentRequest" class="current-request slide-in-right">
+      <!-- 当前请求处理区域 - 固定在底部 -->
+      <div v-if="currentRequest" class="current-request-area">
         <RequestHandler
           :request="currentRequest"
           @response="handleResponse"
           @cancel="handleCancel"
         />
       </div>
+
+      <!-- 等待状态输入区域 - 固定在底部 -->
+      <div v-else class="waiting-input-area">
+        <div class="waiting-message">
+          <span>等待新消息...</span>
+        </div>
+      </div>
     </div>
+
+    <!-- 设置弹窗 -->
+    <SettingsModal
+      v-model:visible="showSettings"
+      @close="closeSettings"
+    />
   </div>
 </template>
 
@@ -257,21 +299,20 @@ async function handleCancel() {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #ffffff;
   overflow: hidden;
   position: relative;
 }
 
-/* 标题栏 */
+/* 自定义标题栏 */
 .title-bar {
-  height: 40px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  height: 50px;
+  background: #fafafa;
+  border-bottom: 1px solid #d9d9d9;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 20px;
   user-select: none;
   flex-shrink: 0;
 }
@@ -279,25 +320,25 @@ async function handleCancel() {
 .title-content {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
 }
 
 .app-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: white;
-  font-weight: 600;
-  font-size: 14px;
+  color: #262626;
+  font-weight: 500;
+  font-size: 16px;
 }
 
 .app-icon {
-  font-size: 16px;
-  color: white;
+  font-size: 18px;
+  color: var(--ant-primary-color, #1890ff);
 }
 
 .app-name {
-  color: white;
+  color: #262626;
 }
 
 .status-indicator {
@@ -306,98 +347,75 @@ async function handleCancel() {
 }
 
 .status-badge :deep(.ant-badge-status-text) {
-  color: white;
-  font-size: 12px;
-  opacity: 0.9;
+  color: #595959;
+  font-size: 13px;
+  font-weight: 400;
 }
 
-.status-badge :deep(.ant-badge-status-dot) {
-  width: 8px;
-  height: 8px;
-}
-
-.window-controls {
+.toolbar {
   display: flex;
   gap: 4px;
 }
 
-.control-btn {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  color: white !important;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.control-btn:hover {
-  background: rgba(255, 255, 255, 0.2) !important;
-  transform: scale(1.1);
-}
-
-.control-btn.close:hover {
-  background: #f44336 !important;
-  color: white !important;
-}
-
-.control-btn.minimize:hover {
-  background: rgba(255, 255, 255, 0.3) !important;
-}
-
-/* 主要内容区域 */
-.main-content {
+/* 聊天容器 */
+.chat-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
-/* 聊天历史区域 */
-.chat-history {
+/* 聊天消息区域 */
+.chat-messages {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.empty-state {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.empty-state :deep(.ant-empty-image) {
-  margin-bottom: 16px;
-}
-
-.empty-icon {
-  font-size: 48px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.empty-description {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 16px;
-}
-
-.empty-description small {
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-/* 消息列表 */
-.messages {
+  background: #f5f5f5;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
+/* 欢迎消息 */
+.welcome-message {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.welcome-content {
+  text-align: center;
+  color: #666;
+}
+
+.welcome-icon {
+  font-size: 48px;
+  color: var(--ant-primary-color, #1890ff);
+  margin-bottom: 16px;
+}
+
+.welcome-content h3 {
+  margin: 16px 0 8px 0;
+  color: #333;
+}
+
+.welcome-content p {
+  margin: 4px 0;
+  color: #666;
+}
+
+.status-text {
+  font-size: 14px;
+  color: #999;
+}
+
+/* 消息气泡 */
 .message-item {
   display: flex;
-  max-width: 80%;
+  max-width: 70%;
+  margin-bottom: 8px;
 }
 
 .message-item.incoming {
@@ -408,80 +426,158 @@ async function handleCancel() {
   align-self: flex-end;
 }
 
-.message-card {
-  width: 100%;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+.message-bubble {
+  padding: 12px 16px;
+  border-radius: 18px;
+  position: relative;
+  word-wrap: break-word;
+  max-width: 100%;
 }
 
-.message-incoming .message-card {
-  background: rgba(255, 255, 255, 0.95);
+.message-item.incoming .message-bubble {
+  background: #ffffff;
+  border: 1px solid #e1e1e1;
+  border-bottom-left-radius: 4px;
 }
 
-.message-outgoing .message-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.message-outgoing .message-content {
+.message-item.outgoing .message-bubble {
+  background: var(--ant-primary-color, #1890ff);
   color: white;
-}
-
-.message-outgoing .message-time {
-  color: rgba(255, 255, 255, 0.8);
+  border-bottom-right-radius: 4px;
 }
 
 .message-content {
-  padding: 0;
-}
-
-.message-text {
   font-size: 14px;
-  line-height: 1.5;
-  word-wrap: break-word;
-  margin-bottom: 8px;
+  line-height: 1.4;
+  margin-bottom: 4px;
 }
 
 .message-time {
   font-size: 11px;
   opacity: 0.7;
+  text-align: right;
+}
+
+.message-item.incoming .message-time {
+  color: #999;
+}
+
+.message-item.outgoing .message-time {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 输入区域 */
+.chat-input-area {
+  background: #ffffff;
+  border-top: 1px solid #e1e1e1;
+  padding: 16px 20px;
+  flex-shrink: 0;
+}
+
+.input-container {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  justify-content: flex-end;
+  gap: 12px;
+  align-items: flex-end;
+  transition: all 0.3s ease;
 }
 
-.time-icon {
-  font-size: 10px;
+.input-container.focused {
+  transform: translateY(-2px);
 }
 
-/* 当前请求区域 */
-.current-request {
-  background: rgba(255, 255, 255, 0.08);
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(15px);
+.reply-input {
   flex: 1;
+  border-radius: 20px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+}
+
+.reply-input:focus {
+  border-color: var(--ant-primary-color, #1890ff);
+  box-shadow: 0 0 0 2px var(--ant-primary-color-outline, rgba(24, 144, 255, 0.2));
+}
+
+.input-actions {
   display: flex;
-  flex-direction: column;
-  min-height: 0;
+  align-items: flex-end;
+}
+
+.send-button {
+  border-radius: 20px;
+  height: 40px;
+  padding: 0 20px;
+}
+
+.input-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #999;
+  text-align: center;
 }
 
 /* 滚动条样式 */
-.chat-history::-webkit-scrollbar {
+.chat-messages::-webkit-scrollbar {
   width: 6px;
 }
 
-.chat-history::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
+.chat-messages::-webkit-scrollbar-track {
+  background: #f3f4f6;
   border-radius: 3px;
 }
 
-.chat-history::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
+.chat-messages::-webkit-scrollbar-thumb {
+  background: #d1d5db;
   border-radius: 3px;
 }
 
-.chat-history::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* 当前请求区域 - 固定在底部 */
+.current-request-area {
+  background: #ffffff;
+  border-top: 1px solid #e1e1e1;
+  flex-shrink: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+.current-request-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.current-request-area::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.current-request-area::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.current-request-area::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* 等待状态区域 */
+.waiting-input-area {
+  background: #ffffff;
+  border-top: 1px solid #e1e1e1;
+  padding: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+.waiting-message {
+  color: #8c8c8c;
+  font-size: 14px;
 }
 </style>

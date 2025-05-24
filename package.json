@@ -6,19 +6,24 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --fix"
+    "lint": "eslint . --fix",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:icon": "tauri icon"
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
-    "@tauri-apps/api": "^1.5.0",
+    "@tauri-apps/api": "^2.5.0",
     "ant-design-vue": "^4.2.6",
-    "vue": "^3.4.0"
+    "vue": "^3.5.14"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.13.2",
-    "@vitejs/plugin-vue": "^5.0.0",
+    "@vitejs/plugin-vue": "^5.2.4",
     "eslint": "^9.27.0",
     "eslint-plugin-format": "^1.0.1",
-    "vite": "^5.0.0"
-  }
+    "vite": "^5.4.19"
+  },
+  "packageManager": "pnpm@10.11.0+sha512.6540583f41cc5f628eb3d9773ecee802f4f9ef9923cc45b69890fb47991d4b092964694ec3a4f738a420c918a333062c8b925d312f42e4f0c263eb603551f977"
 }
