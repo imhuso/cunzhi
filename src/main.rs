@@ -20,14 +20,15 @@ struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            // # Review 命令指南
+            // # 交互式任务规则
 
             // - 需要了解参数时使用 `ai-review-cli help` 命令
-            // - 遇到不确定问题时通过 `ai-review-cli [message] --timeout` 询问，等待回复
+            // - 遇到问题或不确定时必须通过 `ai-review-cli [message] --timeout` 询问，等待回复
             // - 如果超时没有任何输出，默认为我对你做了正面的响应
-            // - 不要自主/自以为完成了任务或结束对话，必须得到用户认可
+            // - 聊天结束时必须运行 `ai-review-cli 你觉得我当前的任务是否已经完成`，不要自主/自以为完成了任务或结束对话，必须得到用户认可
+            // - 然后在恢复对话之前检索输入值。
 
-            init_prompt: "# Review 命令指南\n\n- 需要了解参数时使用 `ai-review-cli help` 命令\n- 遇到不确定问题时通过 `ai-review-cli [message] --timeout` 询问，等待回复\n- 如果超时没有任何输出，默认为我对你做了正面的响应\n- 不要自主/自以为完成了任务或结束对话，必须得到用户认可".to_string(),
+            init_prompt: "# 交互式任务规则\n\n- 需要了解参数时使用 `ai-review-cli help` 命令\n- 遇到问题或不确定时必须通过 `ai-review-cli [message] --timeout` 询问，等待回复\n- 如果超时没有任何输出，默认为我对你做了正面的响应\n- 聊天结束时必须运行 `ai-review-cli 你觉得我当前的任务是否已经完成`，不要自主/自以为完成了任务或结束对话，必须得到用户认可\n- 然后在恢复对话之前检索输入值。".to_string(),
         }
     }
 }
