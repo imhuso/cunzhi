@@ -145,7 +145,7 @@ async function handleCancel() {
 
     await invoke('respond_to_request', {
       requestId: currentRequest.value.id,
-      response: '[用户取消了请求]',
+      response: '[我对你的问题没有更好的意见，你可以按照最佳实践来继续做]',
     })
     console.warn('✅ 请求已取消')
     currentRequest.value = null
