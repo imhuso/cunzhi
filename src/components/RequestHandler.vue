@@ -1,106 +1,20 @@
-<template>
-  <div class="request-container">
-    <div class="request-card">
-      <!-- 请求头部 -->
-      <div class="request-header">
-        <div class="header-icon">📨</div>
-        <h3>收到新消息</h3>
-        <div class="request-id">ID: {{ request.id.slice(0, 8) }}...</div>
-      </div>
-
-      <!-- 可滚动内容区域 -->
-      <div class="scrollable-content">
-        <!-- 消息内容 -->
-        <div class="message-section">
-          <div class="message-bubble">
-            <div class="message-content">
-              {{ request.content }}
-            </div>
-            <div class="message-time">
-              {{ formatTime(new Date()) }}
-            </div>
-          </div>
-        </div>
-
-        <!-- 超时信息 -->
-        <div v-if="request.timeout" class="timeout-section">
-          <div class="timeout-indicator" :class="{ 'urgent': remainingTime <= 10 }">
-            <span class="timeout-icon">⏱️</span>
-            <span class="timeout-text">
-              剩余时间: {{ remainingTime }}秒
-            </span>
-            <div class="timeout-progress">
-              <div
-                class="progress-bar"
-                :style="{ width: progressPercentage + '%' }"
-              ></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 回复区域 -->
-        <div class="response-section">
-          <label for="response-input" class="response-label">
-            💬 您的回复:
-          </label>
-          <textarea
-            id="response-input"
-            v-model="responseText"
-            class="input textarea response-input"
-            placeholder="请输入您的回复..."
-            :disabled="isProcessing"
-            @keydown="handleKeydown"
-            ref="textareaRef"
-          ></textarea>
-
-          <div class="char-count" :class="{ 'warning': responseText.length > 1000 }">
-            {{ responseText.length }}/1000 字符
-          </div>
-        </div>
-      </div>
-
-      <!-- 固定底部操作区域 -->
-      <div class="action-footer">
-        <!-- 操作按钮 -->
-        <div class="action-buttons">
-          <button
-            class="btn btn-secondary"
-            @click="handleCancel"
-            :disabled="isProcessing"
-          >
-            <span class="btn-icon">❌</span>
-            取消
-          </button>
-
-          <button
-            class="btn btn-primary"
-            @click="handleSend"
-            :disabled="!responseText.trim() || isProcessing"
-          >
-            <span class="btn-icon">✅</span>
-            {{ isProcessing ? '发送中...' : '发送回复' }}
-          </button>
-        </div>
-
-        <!-- 快捷键提示 -->
-        <div class="shortcuts-hint">
-          <small>
-            💡 快捷键: Ctrl/Cmd + Enter 发送 | Escape 取消
-          </small>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import {
+  BulbOutlined,
+  ClockCircleOutlined,
+  CloseOutlined,
+  EditOutlined,
+  MailOutlined,
+  MessageOutlined,
+  SendOutlined,
+} from '@ant-design/icons-vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 
 const props = defineProps({
   request: {
     type: Object,
-    required: true
-  }
+    required: true,
+  },
 })
 
 const emit = defineEmits(['response', 'cancel'])
@@ -115,7 +29,8 @@ let timeoutInterval = null
 
 // 计算属性
 const progressPercentage = computed(() => {
-  if (!props.request.timeout) return 100
+  if (!props.request.timeout)
+    return 100
   return (remainingTime.value / props.request.timeout) * 100
 })
 
@@ -145,7 +60,7 @@ onUnmounted(() => {
 })
 
 // 方法
-const startCountdown = () => {
+function startCountdown() {
   timeoutInterval = setInterval(() => {
     remainingTime.value--
 
@@ -157,44 +72,181 @@ const startCountdown = () => {
   }, 1000)
 }
 
-const formatTime = (date) => {
+function formatTime(date) {
   return date.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit'
+    second: '2-digit',
   })
 }
 
-const handleSend = async () => {
-  if (!responseText.value.trim() || isProcessing.value) return
+async function handleSend() {
+  if (!responseText.value.trim() || isProcessing.value)
+    return
 
   isProcessing.value = true
   try {
     emit('response', responseText.value.trim())
-  } finally {
+  }
+  finally {
     isProcessing.value = false
   }
 }
 
-const handleCancel = () => {
-  if (isProcessing.value) return
+function handleCancel() {
+  if (isProcessing.value)
+    return
   emit('cancel')
 }
 
-const handleKeydown = (event) => {
+function handleKeydown(event) {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
     event.preventDefault()
     handleSend()
   }
 }
 
-const handleGlobalKeydown = (event) => {
+function handleGlobalKeydown(event) {
   if (event.key === 'Escape') {
     event.preventDefault()
     handleCancel()
   }
 }
 </script>
+
+<template>
+  <div class="request-container">
+    <a-card class="request-card" :bordered="false">
+      <!-- 请求头部 -->
+      <template #title>
+        <div class="request-header">
+          <div class="header-content">
+            <MailOutlined class="header-icon" />
+            <div class="header-text">
+              <h3>收到新消息</h3>
+              <a-tag size="small" color="blue">
+                ID: {{ request.id.slice(0, 8) }}...
+              </a-tag>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- 可滚动内容区域 -->
+      <div class="scrollable-content">
+        <!-- 消息内容 -->
+        <div class="message-section">
+          <a-card size="small" class="message-bubble">
+            <template #title>
+              <div class="message-header">
+                <MessageOutlined />
+                <span>消息内容</span>
+              </div>
+            </template>
+            <div class="message-content">
+              {{ request.content }}
+            </div>
+            <template #extra>
+              <div class="message-time">
+                <ClockCircleOutlined />
+                {{ formatTime(new Date()) }}
+              </div>
+            </template>
+          </a-card>
+        </div>
+
+        <!-- 超时信息 -->
+        <div v-if="request.timeout" class="timeout-section">
+          <a-alert
+            :type="remainingTime <= 10 ? 'error' : 'warning'"
+            :message="`剩余时间: ${remainingTime}秒`"
+            show-icon
+            class="timeout-alert"
+          >
+            <template #icon>
+              <ClockCircleOutlined :spin="remainingTime <= 10" />
+            </template>
+            <template #description>
+              <a-progress
+                :percent="progressPercentage"
+                :status="remainingTime <= 10 ? 'exception' : 'active'"
+                :stroke-color="remainingTime <= 10 ? '#ff4d4f' : '#1890ff'"
+                size="small"
+              />
+            </template>
+          </a-alert>
+        </div>
+
+        <!-- 回复区域 -->
+        <div class="response-section">
+          <a-form layout="vertical">
+            <a-form-item label="您的回复" class="response-form-item">
+              <template #label>
+                <div class="response-label">
+                  <EditOutlined />
+                  <span>您的回复</span>
+                </div>
+              </template>
+              <a-textarea
+                ref="textareaRef"
+                v-model:value="responseText"
+                :rows="4"
+                :max-length="1000"
+                show-count
+                placeholder="请输入您的回复..."
+                :disabled="isProcessing"
+                class="response-textarea"
+                @keydown="handleKeydown"
+              />
+            </a-form-item>
+          </a-form>
+        </div>
+      </div>
+
+      <!-- 固定底部操作区域 -->
+      <template #actions>
+        <div class="action-footer">
+          <!-- 操作按钮 -->
+          <div class="action-buttons">
+            <a-button
+              size="large"
+              :disabled="isProcessing"
+              class="cancel-btn"
+              @click="handleCancel"
+            >
+              <template #icon>
+                <CloseOutlined />
+              </template>
+              取消
+            </a-button>
+
+            <a-button
+              type="primary"
+              size="large"
+              :disabled="!responseText.trim() || isProcessing"
+              :loading="isProcessing"
+              class="send-btn"
+              @click="handleSend"
+            >
+              <template v-if="!isProcessing" #icon>
+                <SendOutlined />
+              </template>
+              {{ isProcessing ? '发送中...' : '发送回复' }}
+            </a-button>
+          </div>
+
+          <!-- 快捷键提示 -->
+          <div class="shortcuts-hint">
+            <a-typography-text type="secondary" class="hint-text">
+              <BulbOutlined />
+              快捷键: Ctrl/Cmd + Enter 发送 | Escape 取消
+            </a-typography-text>
+          </div>
+        </div>
+      </template>
+    </a-card>
+  </div>
+</template>
 
 <style scoped>
 .request-container {
@@ -212,17 +264,51 @@ const handleGlobalKeydown = (event) => {
   border-radius: 20px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   backdrop-filter: blur(20px);
-  animation: slideUp 0.4s ease-out;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.request-header {
-  text-align: center;
-  padding: 20px 20px 15px 20px;
+.request-card :deep(.ant-card-head) {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   border-bottom: 2px solid rgba(102, 126, 234, 0.1);
-  flex-shrink: 0;
+  border-radius: 20px 20px 0 0;
+}
+
+.request-card :deep(.ant-card-body) {
+  flex: 1;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.request-card :deep(.ant-card-actions) {
+  background: rgba(248, 249, 250, 0.8);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 0 0 20px 20px;
+}
+
+.request-header {
+  width: 100%;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-icon {
+  font-size: 24px;
+  color: #667eea;
+}
+
+.header-text h3 {
+  margin: 0 0 4px 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .scrollable-content {
@@ -233,29 +319,8 @@ const handleGlobalKeydown = (event) => {
 }
 
 .action-footer {
-  flex-shrink: 0;
-  background: rgba(248, 249, 250, 0.8);
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
   padding: 20px;
-  backdrop-filter: blur(10px);
-}
-
-.header-icon {
-  font-size: 32px;
-  margin-bottom: 10px;
-}
-
-.request-header h3 {
-  color: #333;
-  margin-bottom: 8px;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.request-id {
-  color: #999;
-  font-size: 12px;
-  font-family: monospace;
+  width: 100%;
 }
 
 .message-section {
@@ -263,112 +328,62 @@ const handleGlobalKeydown = (event) => {
 }
 
 .message-bubble {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-radius: 18px;
-  padding: 24px;
-  border-left: 5px solid #667eea;
-  position: relative;
+  border-left: 4px solid #667eea;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #667eea;
+  font-weight: 500;
 }
 
 .message-content {
   color: #333;
   line-height: 1.6;
   font-size: 16px;
-  margin-bottom: 10px;
   word-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .message-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: #666;
   font-size: 12px;
-  text-align: right;
 }
 
 .timeout-section {
   margin-bottom: 20px;
 }
 
-.timeout-indicator {
-  background: rgba(255, 193, 7, 0.12);
-  border: 2px solid rgba(255, 193, 7, 0.4);
-  border-radius: 16px;
-  padding: 18px;
-  text-align: center;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(255, 193, 7, 0.1);
-}
-
-.timeout-indicator.urgent {
-  background: rgba(220, 53, 69, 0.1);
-  border-color: rgba(220, 53, 69, 0.3);
-  animation: urgentPulse 1s infinite;
-}
-
-.timeout-icon {
-  font-size: 18px;
-  margin-right: 8px;
-}
-
-.timeout-text {
-  font-weight: 500;
-  color: #333;
-}
-
-.timeout-progress {
-  width: 100%;
-  height: 4px;
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 2px;
-  margin-top: 10px;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
-  transition: width 1s linear;
-  border-radius: 2px;
+.timeout-alert {
+  border-radius: 12px;
 }
 
 .response-section {
   margin-bottom: 0;
 }
 
+.response-form-item {
+  margin-bottom: 0;
+}
+
 .response-label {
-  display: block;
-  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #333;
   font-weight: 600;
   font-size: 16px;
 }
 
-.response-input {
-  min-height: 100px;
-  max-height: 200px;
-  resize: vertical;
-  font-size: 14px;
-  line-height: 1.5;
+.response-textarea {
   border-radius: 12px;
-  border: 2px solid rgba(102, 126, 234, 0.2);
   transition: all 0.3s ease;
-}
-
-.response-input:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-}
-
-.char-count {
-  text-align: right;
-  font-size: 12px;
-  color: #666;
-  margin-top: 5px;
-}
-
-.char-count.warning {
-  color: #dc3545;
-  font-weight: 500;
 }
 
 .action-buttons {
@@ -378,67 +393,40 @@ const handleGlobalKeydown = (event) => {
   margin-bottom: 16px;
 }
 
-.action-buttons .btn {
-  padding: 12px 24px;
-  font-size: 15px;
-  font-weight: 600;
-  border-radius: 12px;
+.cancel-btn,
+.send-btn {
   min-width: 120px;
+  border-radius: 12px;
+  font-weight: 600;
   transition: all 0.3s ease;
 }
 
-.action-buttons .btn-primary {
+.send-btn {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
 }
 
-.action-buttons .btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-}
-
-.action-buttons .btn-secondary {
-  background: rgba(108, 117, 125, 0.1);
-  color: #6c757d;
-  border: 2px solid rgba(108, 117, 125, 0.2);
-}
-
-.action-buttons .btn-secondary:hover:not(:disabled) {
-  background: rgba(108, 117, 125, 0.15);
-  border-color: rgba(108, 117, 125, 0.3);
+.cancel-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-}
-
-.btn-icon {
-  font-size: 16px;
-  margin-right: 4px;
 }
 
 .shortcuts-hint {
   text-align: center;
-  color: #666;
+}
+
+.hint-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-size: 13px;
   opacity: 0.8;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes urgentPulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
-  }
 }
 
 /* 滚动条样式 */
@@ -463,10 +451,6 @@ const handleGlobalKeydown = (event) => {
 
 /* 响应式设计 */
 @media (max-height: 600px) {
-  .request-header {
-    padding: 15px 20px 10px 20px;
-  }
-
   .scrollable-content {
     padding: 15px 20px 10px 20px;
   }
@@ -475,7 +459,7 @@ const handleGlobalKeydown = (event) => {
     padding: 15px 20px;
   }
 
-  .response-input {
+  .response-textarea {
     min-height: 80px;
   }
 }

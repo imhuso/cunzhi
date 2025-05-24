@@ -1,74 +1,15 @@
-<template>
-  <div class="app-container">
-    <!-- 窗口标题栏 -->
-    <div class="title-bar" data-tauri-drag-region>
-      <div class="title-content">
-        <div class="app-title">
-          <span class="app-icon">🤖</span>
-          <span>AI Review</span>
-        </div>
-        <div class="status-indicator">
-          <div
-            class="status-dot"
-            :class="{
-              'connected': isConnected,
-              'disconnected': !isConnected,
-              'pulse': isConnected
-            }"
-          ></div>
-          <span class="status-text">
-            {{ isConnected ? '已连接' : '连接中...' }}
-          </span>
-        </div>
-      </div>
-      <div class="window-controls">
-        <button class="control-btn minimize" @click="minimizeWindow">−</button>
-        <button class="control-btn close" @click="closeWindow">×</button>
-      </div>
-    </div>
-
-    <!-- 主要内容区域 -->
-    <div class="main-content">
-      <!-- 聊天历史区域 -->
-      <div class="chat-history" ref="chatHistoryRef">
-        <div v-if="chatHistory.length === 0" class="empty-state">
-          <div class="empty-icon">💬</div>
-          <p>暂无聊天记录</p>
-          <small>等待命令行消息...</small>
-        </div>
-
-        <div v-else class="messages">
-          <div
-            v-for="message in chatHistory"
-            :key="message.id"
-            class="message-item"
-            :class="message.type"
-          >
-            <div class="message-content">
-              <div class="message-text">{{ message.content }}</div>
-              <div class="message-time">{{ formatTime(message.timestamp) }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 当前请求处理区域 -->
-      <div v-if="currentRequest" class="current-request">
-        <RequestHandler
-          :request="currentRequest"
-          @response="handleResponse"
-          @cancel="handleCancel"
-        />
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
-import { invoke } from '@tauri-apps/api/tauri'
+import {
+  ClockCircleOutlined,
+  CloseOutlined,
+  MessageOutlined,
+  MinusOutlined,
+  RobotOutlined,
+} from '@ant-design/icons-vue'
 import { listen } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/tauri'
 import { appWindow } from '@tauri-apps/api/window'
+import { nextTick, onMounted, ref } from 'vue'
 import RequestHandler from './components/RequestHandler.vue'
 
 // 响应式数据
@@ -81,12 +22,12 @@ const chatHistoryRef = ref(null)
 // 聊天历史管理（限制数量以优化性能）
 const MAX_HISTORY_ITEMS = 100
 
-const addToHistory = (type, content, id = null) => {
+function addToHistory(type, content, id = null) {
   const message = {
     id: id || Date.now().toString(),
     type, // 'incoming' 或 'outgoing'
     content,
-    timestamp: new Date()
+    timestamp: new Date(),
   }
 
   chatHistory.value.push(message)
@@ -104,72 +45,76 @@ const addToHistory = (type, content, id = null) => {
   })
 }
 
-const formatTime = (date) => {
+function formatTime(date) {
   return date.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit'
+    second: '2-digit',
   })
 }
 
 // 窗口控制
-const minimizeWindow = async () => {
+async function minimizeWindow() {
   try {
     await appWindow.minimize()
-  } catch (error) {
+  }
+  catch (error) {
     console.error('最小化窗口失败:', error)
   }
 }
 
-const closeWindow = async () => {
+async function closeWindow() {
   try {
     await appWindow.close()
-  } catch (error) {
+  }
+  catch (error) {
     console.error('关闭窗口失败:', error)
   }
 }
 
 // 初始化应用
 onMounted(async () => {
-  console.log('🚀 AI Review Vue App 初始化中...')
-  console.log('🔧 Tauri API 可用性检查:', !!window.__TAURI__)
+  console.warn('🚀 AI Review Vue App 初始化中...')
+  console.warn('🔧 Tauri API 可用性检查:', !!window.__TAURI__)
 
   try {
     // 获取应用信息
     appInfo.value = await invoke('get_app_info')
-    console.log('✅ 应用信息获取成功:', appInfo.value)
-  } catch (error) {
+    console.warn('✅ 应用信息获取成功:', appInfo.value)
+  }
+  catch (error) {
     console.error('❌ 获取应用信息失败:', error)
     appInfo.value = 'AI Review App v0.1.0'
   }
 
   // 监听新请求事件
   try {
-    console.log('🔧 开始设置事件监听器...')
-    const unlisten = await listen('new-request', (event) => {
-      console.log('🎯 收到新请求事件:', event)
+    console.warn('🔧 开始设置事件监听器...')
+    await listen('new-request', (event) => {
+      console.warn('🎯 收到新请求事件:', event)
       const message = event.payload
-      console.log('📨 解析后的消息:', message)
+      console.warn('📨 解析后的消息:', message)
 
       // 添加到聊天历史
       addToHistory('incoming', message.content, message.id)
 
       // 设置当前请求
       currentRequest.value = message
-      console.log('📨 currentRequest已更新:', currentRequest.value)
+      console.warn('📨 currentRequest已更新:', currentRequest.value)
     })
-    console.log('✅ 事件监听器设置成功')
+    console.warn('✅ 事件监听器设置成功')
     isConnected.value = true
-
-  } catch (error) {
+  }
+  catch (error) {
     console.error('❌ 设置事件监听器失败:', error)
     isConnected.value = false
   }
 })
 
 // 处理用户回复
-const handleResponse = async (response) => {
-  if (!currentRequest.value) return
+async function handleResponse(response) {
+  if (!currentRequest.value)
+    return
 
   try {
     // 添加回复到聊天历史
@@ -177,19 +122,21 @@ const handleResponse = async (response) => {
 
     await invoke('respond_to_request', {
       id: currentRequest.value.id,
-      response: response
+      response,
     })
-    console.log('✅ 回复发送成功:', response)
+    console.warn('✅ 回复发送成功:', response)
     currentRequest.value = null
-  } catch (error) {
+  }
+  catch (error) {
     console.error('❌ 发送回复失败:', error)
-    alert('发送回复失败: ' + error)
+    console.error(`发送回复失败: ${error}`)
   }
 }
 
 // 处理取消操作
-const handleCancel = async () => {
-  if (!currentRequest.value) return
+async function handleCancel() {
+  if (!currentRequest.value)
+    return
 
   try {
     // 添加取消信息到聊天历史
@@ -197,15 +144,112 @@ const handleCancel = async () => {
 
     await invoke('respond_to_request', {
       id: currentRequest.value.id,
-      response: '[用户取消了请求]'
+      response: '[用户取消了请求]',
     })
-    console.log('✅ 请求已取消')
+    console.warn('✅ 请求已取消')
     currentRequest.value = null
-  } catch (error) {
+  }
+  catch (error) {
     console.error('❌ 取消请求失败:', error)
   }
 }
 </script>
+
+<template>
+  <div class="app-container">
+    <!-- 窗口标题栏 -->
+    <div class="title-bar window-drag-region">
+      <div class="title-content">
+        <div class="app-title">
+          <RobotOutlined class="app-icon" />
+          <span class="app-name">AI Review</span>
+        </div>
+        <div class="status-indicator">
+          <a-badge
+            :status="isConnected ? 'processing' : 'error'"
+            :text="isConnected ? '已连接' : '连接中...'"
+            class="status-badge"
+          />
+        </div>
+      </div>
+      <div class="window-controls window-no-drag">
+        <a-button
+          type="text"
+          size="small"
+          class="control-btn minimize"
+          @click="minimizeWindow"
+        >
+          <MinusOutlined />
+        </a-button>
+        <a-button
+          type="text"
+          size="small"
+          class="control-btn close"
+          @click="closeWindow"
+        >
+          <CloseOutlined />
+        </a-button>
+      </div>
+    </div>
+
+    <!-- 主要内容区域 -->
+    <div class="main-content">
+      <!-- 聊天历史区域 -->
+      <div ref="chatHistoryRef" class="chat-history">
+        <a-empty
+          v-if="chatHistory.length === 0"
+          class="empty-state"
+          description="暂无聊天记录"
+        >
+          <template #image>
+            <MessageOutlined class="empty-icon" />
+          </template>
+          <template #description>
+            <span class="empty-description">
+              暂无聊天记录<br />
+              <small>等待命令行消息...</small>
+            </span>
+          </template>
+        </a-empty>
+
+        <div v-else class="messages">
+          <div
+            v-for="message in chatHistory"
+            :key="message.id"
+            class="message-item fade-in-up"
+            :class="message.type"
+          >
+            <a-card
+              :bordered="false"
+              size="small"
+              class="message-card"
+              :class="`message-${message.type}`"
+            >
+              <div class="message-content">
+                <div class="message-text">
+                  {{ message.content }}
+                </div>
+                <div class="message-time">
+                  <ClockCircleOutlined class="time-icon" />
+                  {{ formatTime(message.timestamp) }}
+                </div>
+              </div>
+            </a-card>
+          </div>
+        </div>
+      </div>
+
+      <!-- 当前请求处理区域 -->
+      <div v-if="currentRequest" class="current-request slide-in-right">
+        <RequestHandler
+          :request="currentRequest"
+          @response="handleResponse"
+          @cancel="handleCancel"
+        />
+      </div>
+    </div>
+  </div>
+</template>
 
 <style scoped>
 .app-container {
@@ -214,11 +258,8 @@ const handleCancel = async () => {
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-  margin: 8px;
-  height: calc(100vh - 16px);
+  position: relative;
 }
 
 /* 标题栏 */
@@ -232,6 +273,7 @@ const handleCancel = async () => {
   justify-content: space-between;
   padding: 0 16px;
   user-select: none;
+  flex-shrink: 0;
 }
 
 .title-content {
@@ -251,69 +293,57 @@ const handleCancel = async () => {
 
 .app-icon {
   font-size: 16px;
+  color: white;
+}
+
+.app-name {
+  color: white;
 }
 
 .status-indicator {
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-}
-
-.status-dot.connected {
-  background: #4CAF50;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
-}
-
-.status-dot.disconnected {
-  background: #f44336;
-  box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.3);
-}
-
-.status-dot.pulse {
-  animation: statusPulse 2s infinite;
-}
-
-.status-text {
+.status-badge :deep(.ant-badge-status-text) {
   color: white;
   font-size: 12px;
   opacity: 0.9;
 }
 
+.status-badge :deep(.ant-badge-status-dot) {
+  width: 8px;
+  height: 8px;
+}
+
 .window-controls {
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
 .control-btn {
-  width: 20px;
-  height: 20px;
-  border: none;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  font-size: 12px;
-  font-weight: bold;
-  cursor: pointer;
+  color: white !important;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
 }
 
 .control-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.2) !important;
   transform: scale(1.1);
 }
 
 .control-btn.close:hover {
-  background: #f44336;
+  background: #f44336 !important;
+  color: white !important;
+}
+
+.control-btn.minimize:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
 }
 
 /* 主要内容区域 */
@@ -333,27 +363,27 @@ const handleCancel = async () => {
 }
 
 .empty-state {
+  height: 100%;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  color: rgba(255, 255, 255, 0.7);
-  text-align: center;
+}
+
+.empty-state :deep(.ant-empty-image) {
+  margin-bottom: 16px;
 }
 
 .empty-icon {
   font-size: 48px;
-  margin-bottom: 16px;
-  opacity: 0.5;
+  color: rgba(255, 255, 255, 0.5);
 }
 
-.empty-state p {
+.empty-description {
+  color: rgba(255, 255, 255, 0.7);
   font-size: 16px;
-  margin-bottom: 8px;
 }
 
-.empty-state small {
+.empty-description small {
   font-size: 12px;
   opacity: 0.7;
 }
@@ -368,7 +398,6 @@ const handleCancel = async () => {
 .message-item {
   display: flex;
   max-width: 80%;
-  animation: messageSlideIn 0.3s ease-out;
 }
 
 .message-item.incoming {
@@ -379,36 +408,51 @@ const handleCancel = async () => {
   align-self: flex-end;
 }
 
-.message-content {
-  background: rgba(255, 255, 255, 0.9);
+.message-card {
+  width: 100%;
   border-radius: 16px;
-  padding: 12px 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: relative;
+  transition: all 0.3s ease;
 }
 
-.message-item.incoming .message-content {
-  background: rgba(255, 255, 255, 0.9);
-  border-bottom-left-radius: 4px;
+.message-incoming .message-card {
+  background: rgba(255, 255, 255, 0.95);
 }
 
-.message-item.outgoing .message-content {
+.message-outgoing .message-card {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.message-outgoing .message-content {
   color: white;
-  border-bottom-right-radius: 4px;
+}
+
+.message-outgoing .message-time {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.message-content {
+  padding: 0;
 }
 
 .message-text {
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.5;
   word-wrap: break-word;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .message-time {
   font-size: 11px;
   opacity: 0.7;
-  text-align: right;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.time-icon {
+  font-size: 10px;
 }
 
 /* 当前请求区域 */
@@ -420,27 +464,6 @@ const handleCancel = async () => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-/* 动画 */
-@keyframes statusPulse {
-  0%, 100% {
-    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(76, 175, 80, 0.1);
-  }
-}
-
-@keyframes messageSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* 滚动条样式 */
