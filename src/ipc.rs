@@ -135,20 +135,34 @@ fn handle_client_with_timeout(
             return Err(anyhow::anyhow!("❌ 发送消息到UI处理程序失败"));
         }
 
-        // 使用消息中指定的超时时间，默认30秒
-        let timeout_secs = message.timeout.unwrap_or(30);
-
-        // 等待UI响应 (使用自定义超时)
-        match response_rx.recv_timeout(Duration::from_secs(timeout_secs)) {
-            Ok(user_response) => {
-                let response = Message::new_response(message.id, user_response);
-                let response_json = serde_json::to_string(&response)?;
-                writeln!(stream, "{}", response_json)?;
+        // 等待UI响应
+        if let Some(timeout_secs) = message.timeout {
+            // 有超时时间，使用超时等待
+            match response_rx.recv_timeout(Duration::from_secs(timeout_secs)) {
+                Ok(user_response) => {
+                    let response = Message::new_response(message.id, user_response);
+                    let response_json = serde_json::to_string(&response)?;
+                    writeln!(stream, "{}", response_json)?;
+                }
+                Err(_) => {
+                    let error = Message::new_error(message.id, format!("❌ 超时未收到回复 ({}秒)", timeout_secs));
+                    let error_json = serde_json::to_string(&error)?;
+                    writeln!(stream, "{}", error_json)?;
+                }
             }
-            Err(_) => {
-                let error = Message::new_error(message.id, format!("❌ 超时未收到回复 ({}秒)", timeout_secs));
-                let error_json = serde_json::to_string(&error)?;
-                writeln!(stream, "{}", error_json)?;
+        } else {
+            // 没有超时时间，无限等待
+            match response_rx.recv() {
+                Ok(user_response) => {
+                    let response = Message::new_response(message.id, user_response);
+                    let response_json = serde_json::to_string(&response)?;
+                    writeln!(stream, "{}", response_json)?;
+                }
+                Err(_) => {
+                    let error = Message::new_error(message.id, "❌ 连接已断开".to_string());
+                    let error_json = serde_json::to_string(&error)?;
+                    writeln!(stream, "{}", error_json)?;
+                }
             }
         }
     }
@@ -228,7 +242,32 @@ pub struct IpcClient;
 
 impl IpcClient {
     pub fn send_message(content: String) -> Result<String> {
-        Self::send_message_with_timeout(content, 30)
+        let socket_path = get_socket_path();
+        let mut stream = LocalSocketStream::connect(socket_path)?;
+
+        let message = Message::new_request(content);
+        let message_json = serde_json::to_string(&message)?;
+
+        writeln!(stream, "{}", message_json)?;
+
+        // 读取响应 - 无超时，一直等待
+        let mut buffer = [0; 4096];
+        let bytes_read = stream.read(&mut buffer)?;
+        let received_data = String::from_utf8_lossy(&buffer[..bytes_read]);
+
+        // 查找第一个换行符
+        if let Some(newline_pos) = received_data.find('\n') {
+            let line = &received_data[..newline_pos];
+            let response: Message = serde_json::from_str(line.trim())?;
+
+            // 检查是否是错误响应
+            match response.message_type {
+                MessageType::Error => Err(anyhow::anyhow!("{}", response.content)),
+                _ => Ok(response.content),
+            }
+        } else {
+            Err(anyhow::anyhow!("❌ 未收到有效响应"))
+        }
     }
 
     pub fn send_message_with_timeout(content: String, timeout: u64) -> Result<String> {

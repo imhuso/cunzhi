@@ -54,19 +54,16 @@ fn main() -> Result<()> {
                 .short('t')
                 .long("timeout")
                 .value_name("SECONDS")
-                .help("超时时间 (default: 30)")
-                .default_value("30"),
+                .help("超时时间 (不指定则无超时)"),
         )
         .get_matches();
 
     let message = matches.get_one::<String>("message")
         .map(|s| s.as_str())
         .unwrap_or("init");
-    let timeout: u64 = matches
+    let timeout: Option<u64> = matches
         .get_one::<String>("timeout")
-        .unwrap()
-        .parse()
-        .unwrap_or(30);
+        .map(|s| s.parse().unwrap_or(30));
 
     // 处理 help 命令
     if message == "help" {
@@ -74,7 +71,12 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    match IpcClient::send_message_with_timeout(message.to_string(), timeout) {
+    let result = match timeout {
+        Some(t) => IpcClient::send_message_with_timeout(message.to_string(), t),
+        None => IpcClient::send_message(message.to_string()),
+    };
+
+    match result {
         Ok(response) => {
             println!("{}", response);
         }

@@ -1,10 +1,9 @@
 <script setup>
 import {
-  BulbOutlined,
   ClockCircleOutlined,
   SendOutlined,
 } from '@ant-design/icons-vue'
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps({
   request: {
@@ -21,30 +20,42 @@ const isProcessing = ref(false)
 const remainingTime = ref(props.request.timeout || 30)
 const textareaRef = ref(null)
 const inputFocused = ref(false)
+const isReplied = ref(false) // 添加已回复状态
 
 let timeoutInterval = null
 
-// 计算属性
-const progressPercentage = computed(() => {
-  if (!props.request.timeout)
-    return 100
-  return (remainingTime.value / props.request.timeout) * 100
-})
+
+
+// 监听request变化，重置状态
+watch(() => props.request, (newRequest) => {
+  if (newRequest) {
+    // 重置状态
+    responseText.value = ''
+    isReplied.value = false
+    remainingTime.value = newRequest.timeout || 30
+
+    // 清除之前的倒计时
+    if (timeoutInterval) {
+      clearInterval(timeoutInterval)
+      timeoutInterval = null
+    }
+
+    // 启动新的倒计时
+    if (newRequest.timeout) {
+      startCountdown()
+    }
+
+    // 自动聚焦到输入框
+    nextTick(() => {
+      if (textareaRef.value) {
+        textareaRef.value.focus()
+      }
+    })
+  }
+}, { immediate: true })
 
 // 生命周期
 onMounted(() => {
-  // 自动聚焦到输入框
-  nextTick(() => {
-    if (textareaRef.value) {
-      textareaRef.value.focus()
-    }
-  })
-
-  // 启动倒计时
-  if (props.request.timeout) {
-    startCountdown()
-  }
-
   // 添加键盘事件监听
   document.addEventListener('keydown', handleGlobalKeydown)
 })
@@ -72,12 +83,15 @@ function startCountdown() {
 
 
 async function handleSend() {
-  if (!responseText.value.trim() || isProcessing.value)
+  if (!responseText.value.trim() || isProcessing.value || isReplied.value)
     return
 
   isProcessing.value = true
   try {
     emit('response', responseText.value.trim())
+    // 发送成功后清空输入框并标记为已回复
+    responseText.value = ''
+    isReplied.value = true
   }
   finally {
     isProcessing.value = false
@@ -85,8 +99,9 @@ async function handleSend() {
 }
 
 function handleCancel() {
-  if (isProcessing.value)
+  if (isProcessing.value || isReplied.value)
     return
+  isReplied.value = true
   emit('cancel')
 }
 
@@ -117,70 +132,51 @@ function handleGlobalKeydown(event) {
 
 <template>
   <div class="request-container">
-    <!-- 消息内容 -->
-    <div class="message-content">
-      {{ request.content }}
-    </div>
-
     <!-- 回复区域 -->
     <div class="reply-section">
       <div class="input-container">
-        <a-textarea
-          ref="textareaRef"
-          v-model:value="responseText"
-          :auto-size="inputFocused ? { minRows: 3, maxRows: 8 } : { minRows: 1, maxRows: 1 }"
-          :max-length="1000"
-          placeholder="请输入您的回复..."
-          :disabled="isProcessing"
-          class="reply-textarea"
-          @focus="onInputFocus"
-          @blur="onInputBlur"
-          @keydown="handleKeydown"
-        />
-        <div class="input-actions">
-          <span class="char-count">{{ responseText.length }}/1000</span>
-          <a-button
-            :disabled="!responseText.trim() || isProcessing"
-            :loading="isProcessing"
-            @click="handleSend"
-            class="send-button"
-            size="small"
-          >
-            <template v-if="!isProcessing" #icon>
-              <SendOutlined />
-            </template>
-            {{ isProcessing ? '发送中' : '发送' }}
-          </a-button>
+        <div class="textarea-container">
+          <a-textarea
+            ref="textareaRef"
+            v-model:value="responseText"
+            :auto-size="{ minRows: 2, maxRows: 4 }"
+            :max-length="1000"
+            :placeholder="isReplied ? '已回复' : '请输入您的回复...'"
+            :disabled="isProcessing || isReplied"
+            class="reply-textarea"
+            @focus="onInputFocus"
+            @blur="onInputBlur"
+            @keydown="handleKeydown"
+          />
+          <div class="textarea-actions">
+            <span class="char-count">{{ responseText.length }}/1000</span>
+
+            <!-- 倒计时信息 - 放在中间 -->
+            <div v-if="request.timeout && remainingTime > 0 && !isReplied" class="countdown-inline">
+              <ClockCircleOutlined />
+              <span>{{ remainingTime }}s</span>
+            </div>
+
+            <a-button
+              :disabled="!responseText.trim() || isProcessing || isReplied"
+              :loading="isProcessing"
+              @click="handleSend"
+              class="send-button"
+              size="small"
+              :title="isReplied ? '' : 'CMD+Enter 发送'"
+            >
+              <template v-if="!isProcessing" #icon>
+                <SendOutlined />
+              </template>
+              {{ isReplied ? '已发送' : (isProcessing ? '发送中' : '发送') }}
+            </a-button>
+          </div>
         </div>
       </div>
 
-      <!-- 倒计时信息 - 只在有超时参数时显示 -->
-      <div v-if="request.timeout && remainingTime > 0" class="countdown-info">
-        <ClockCircleOutlined
-          :spin="remainingTime <= 10"
-          :style="{ color: remainingTime <= 10 ? '#ff4d4f' : 'var(--ant-primary-color, #1890ff)' }"
-        />
-        <span
-          class="countdown-text"
-          :style="{ color: remainingTime <= 10 ? '#ff4d4f' : '#666' }"
-        >
-          剩余 {{ remainingTime }}秒
-        </span>
-        <a-progress
-          :percent="progressPercentage"
-          :status="remainingTime <= 10 ? 'exception' : 'active'"
-          :stroke-color="remainingTime <= 10 ? '#ff4d4f' : 'var(--ant-primary-color, #1890ff)'"
-          size="small"
-          :show-info="false"
-          class="countdown-progress"
-        />
-      </div>
 
-      <!-- 快捷键提示 -->
-      <div class="shortcuts-hint" v-if="inputFocused">
-        <BulbOutlined />
-        <span>CMD+Enter 发送，Enter 换行</span>
-      </div>
+
+
     </div>
   </div>
 </template>
@@ -190,8 +186,7 @@ function handleGlobalKeydown(event) {
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  height: 100%;
+  gap: 12px;
 }
 
 /* 消息内容 */
@@ -214,7 +209,6 @@ function handleGlobalKeydown(event) {
   border: 1px solid #e1e1e1;
   border-radius: 12px;
   padding: 16px;
-  flex: 1;
   display: flex;
   flex-direction: column;
 }
@@ -225,29 +219,42 @@ function handleGlobalKeydown(event) {
   gap: 8px;
 }
 
+.textarea-container {
+  position: relative;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.textarea-container:focus-within {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
 .reply-textarea {
   border: none;
-  border-radius: 8px;
-  background: #f7f7f7;
-  padding: 12px;
+  background: transparent;
+  padding: 12px 12px 8px 12px;
   resize: none;
-  transition: all 0.2s ease;
   font-size: 14px;
   line-height: 1.5;
+  width: 100%;
 }
 
 .reply-textarea:focus {
-  background: #ffffff;
-  border: 1px solid #e8e8e8;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   outline: none;
+  box-shadow: none;
 }
 
-.input-actions {
+.textarea-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 4px;
+  padding: 8px 12px;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+  border-radius: 0 0 8px 8px;
 }
 
 .char-count {
@@ -255,63 +262,38 @@ function handleGlobalKeydown(event) {
   color: #999;
 }
 
-/* 倒计时信息 */
-.countdown-info {
+/* 内联倒计时 */
+.countdown-inline {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px;
-  background: #f9f9f9;
-  border-radius: 6px;
-  margin-top: 8px;
+  gap: 4px;
+  font-size: 12px;
+  color: #666;
+  padding: 2px 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
 }
 
-.countdown-text {
-  font-size: 13px;
+.countdown-inline span {
   font-weight: 500;
 }
 
-.countdown-progress {
-  width: 120px;
-  margin-left: 8px;
-}
+
 
 .send-button {
-  background: #f0f0f0 !important;
-  border: 1px solid #e0e0e0 !important;
-  color: #333 !important;
   border-radius: 6px !important;
   font-size: 12px !important;
-  height: 28px !important;
-  padding: 0 12px !important;
+  height: 32px !important;
+  padding: 0 16px !important;
   transition: all 0.2s ease !important;
-}
-
-.send-button:hover:not(:disabled) {
-  background: #e8f4fd !important;
-  border-color: #91d5ff !important;
-  color: #1890ff !important;
+  flex-shrink: 0;
 }
 
 .send-button:disabled {
-  background: #f5f5f5 !important;
-  border-color: #e0e0e0 !important;
-  color: #bbb !important;
   cursor: not-allowed !important;
 }
 
-/* 快捷键提示 */
-.shortcuts-hint {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: #8c8c8c;
-  font-size: 12px;
-  padding-top: 8px;
-  border-top: 1px solid #f0f0f0;
-}
+
 
 /* 响应式设计 */
 @media (max-width: 768px) {
@@ -337,11 +319,23 @@ function handleGlobalKeydown(event) {
 
 @media (max-height: 600px) {
   .request-container {
-    max-height: 50vh;
+    padding: 12px;
   }
 
-  .reply-textarea {
-    min-height: 60px;
+  .reply-section {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .textarea-actions {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .send-button {
+    width: 100%;
   }
 }
 </style>

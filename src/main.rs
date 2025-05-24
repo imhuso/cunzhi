@@ -49,13 +49,13 @@ impl Default for AppState {
 
 #[tauri::command]
 async fn respond_to_request(
-    id: String,
+    request_id: String,
     response: String,
     state: State<'_, AppState>,
     window: tauri::Window,
 ) -> Result<(), String> {
     let mut pending = state.pending_requests.lock().unwrap();
-    if let Some(sender) = pending.remove(&id) {
+    if let Some(sender) = pending.remove(&request_id) {
         sender.send(response).map_err(|_| "Failed to send response".to_string())?;
 
         // 如果是弹窗窗口，关闭它
@@ -134,60 +134,60 @@ async fn check_cli_installed() -> Result<bool, String> {
 
 async fn install_cli_symlink(app: &tauri::AppHandle) -> Result<String> {
     use std::process::Command;
-    
+
     // 获取当前应用的路径
     let app_path = std::env::current_exe()
         .map_err(|e| anyhow::anyhow!("无法获取应用路径: {}", e))?;
-    
+
     let app_dir = app_path.parent()
         .ok_or_else(|| anyhow::anyhow!("无法获取应用目录"))?;
-    
+
     // CLI二进制文件在应用bundle中的路径
     let cli_source = app_dir.join("ai-review-cli");
     let cli_target = "/usr/local/bin/ai-review-cli";
-    
+
     // 检查源文件是否存在
     if !cli_source.exists() {
         return Err(anyhow::anyhow!("CLI二进制文件不存在: {:?}", cli_source));
     }
-    
+
     // 创建 /usr/local/bin 目录（如果不存在）
     let output = Command::new("mkdir")
         .args(["-p", "/usr/local/bin"])
         .output()
         .map_err(|e| anyhow::anyhow!("创建目录失败: {}", e))?;
-    
+
     if !output.status.success() {
         return Err(anyhow::anyhow!("创建 /usr/local/bin 目录失败"));
     }
-    
+
     // 移除旧的符号链接（如果存在）
     if std::path::Path::new(cli_target).exists() {
         let _ = std::fs::remove_file(cli_target);
     }
-    
+
     // 创建符号链接
     let output = Command::new("ln")
         .args(["-s", &cli_source.to_string_lossy(), cli_target])
         .output()
         .map_err(|e| anyhow::anyhow!("创建符号链接失败: {}", e))?;
-    
+
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
         return Err(anyhow::anyhow!("创建符号链接失败: {}", error_msg));
     }
-    
+
     // 设置执行权限
     let output = Command::new("chmod")
         .args(["+x", cli_target])
         .output()
         .map_err(|e| anyhow::anyhow!("设置执行权限失败: {}", e))?;
-    
+
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
         return Err(anyhow::anyhow!("设置执行权限失败: {}", error_msg));
     }
-    
+
     Ok(format!("CLI命令已成功安装到: {}", cli_target))
 }
 
@@ -199,7 +199,7 @@ async fn auto_install_cli_on_startup(app: &tauri::AppHandle) -> Result<()> {
         match install_cli_symlink(app).await {
             Ok(msg) => {
                 println!("✅ {}", msg);
-                
+
                 // 发送通知
                 let notification_result = Notification::new()
                     .summary("AI Review")
@@ -207,7 +207,7 @@ async fn auto_install_cli_on_startup(app: &tauri::AppHandle) -> Result<()> {
                     .icon("dialog-information")
                     .timeout(5000)
                     .show();
-                
+
                 if let Err(e) = notification_result {
                     eprintln!("❌ 发送安装通知失败: {}", e);
                 }
@@ -219,7 +219,7 @@ async fn auto_install_cli_on_startup(app: &tauri::AppHandle) -> Result<()> {
     } else {
         println!("✅ CLI命令已安装");
     }
-    
+
     Ok(())
 }
 
