@@ -81,8 +81,7 @@ fn main() -> Result<()> {
             println!("{}", response);
         }
         Err(e) => {
-            eprintln!("❌ 错误: {}", e);
-            eprintln!("请确保 AI Review UI 应用正在运行。");
+            eprintln!("{}", e);
             std::process::exit(1);
         }
     }

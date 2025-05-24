@@ -196,29 +196,20 @@ async fn auto_install_cli_on_startup(app: &tauri::AppHandle) -> Result<()> {
     // 检查CLI是否已安装
     let cli_path = "/usr/local/bin/ai-review-cli";
     if !std::path::Path::new(cli_path).exists() {
-        println!("🔧 CLI命令未安装，正在自动安装...");
         match install_cli_symlink(app).await {
-            Ok(msg) => {
-                println!("✅ {}", msg);
-
+            Ok(_) => {
                 // 发送通知
-                let notification_result = Notification::new()
+                let _ = Notification::new()
                     .summary("AI Review")
                     .body("CLI命令已自动安装，您现在可以在终端中使用 'ai-review-cli' 命令")
                     .icon("dialog-information")
                     .timeout(5000)
                     .show();
-
-                if let Err(e) = notification_result {
-                    eprintln!("❌ 发送安装通知失败: {}", e);
-                }
             }
-            Err(e) => {
-                eprintln!("❌ 自动安装CLI命令失败: {}", e);
+            Err(_) => {
+                // 静默处理安装失败
             }
         }
-    } else {
-        println!("✅ CLI命令已安装");
     }
 
     Ok(())
@@ -263,122 +254,67 @@ async fn load_config(state: &State<'_, AppState>, app: &AppHandle) -> Result<()>
 }
 
 async fn start_ipc_server(app_handle: AppHandle) -> Result<()> {
-    println!("Starting IPC server...");
-    let socket_path = ipc::get_socket_path();
-    println!("📁 Socket路径: {:?}", socket_path);
-
     let (tx, mut rx) = tokio_mpsc::unbounded_channel::<(Message, mpsc::Sender<String>)>();
 
     // 启动IPC服务器
     let server = IpcServer::new(tx)?;
-    println!("IPC server created successfully");
     tokio::spawn(async move {
-        println!("IPC server task started");
-        if let Err(e) = server.run().await {
-            eprintln!("IPC server error: {}", e);
-        }
+        let _ = server.run().await;
     });
 
     // 处理接收到的消息
     tokio::spawn(async move {
-        println!("📨 消息处理任务已启动");
         while let Some((message, response_sender)) = rx.recv().await {
-            println!("📥 从IPC接收到消息: {:?}", message);
             match message.message_type {
                 MessageType::Request => {
-                    println!("🎯 处理请求类型消息");
-
                     // 检查是否是 init 指令
                     if message.content.trim().eq_ignore_ascii_case("init") {
-                        println!("🔧 检测到 init 指令，返回提示词");
                         if let Some(state) = app_handle.try_state::<AppState>() {
                             let config = state.config.lock().unwrap();
                             let init_prompt = config.init_prompt.clone();
                             drop(config); // 释放锁
 
                             // 直接发送提示词作为响应
-                            if let Err(e) = response_sender.send(init_prompt) {
-                                eprintln!("❌ 发送 init 提示词失败: {}", e);
-                            } else {
-                                println!("✅ init 提示词已发送");
-                            }
+                            let _ = response_sender.send(init_prompt);
                         } else {
-                            eprintln!("❌ 无法获取应用状态");
                             let _ = response_sender.send("错误：无法获取配置".to_string());
                         }
                         continue; // 跳过正常的UI处理流程
                     }
 
                     // 存储待处理的请求
-                    println!("💾 正在存储待处理的请求...");
                     if let Some(state) = app_handle.try_state::<AppState>() {
                         let mut pending = state.pending_requests.lock().unwrap();
                         pending.insert(message.id.clone(), response_sender);
-                        println!("✅ 已存储请求，ID: {}", message.id);
-                    } else {
-                        println!("❌ 无法获取应用状态");
                     }
 
                     // 直接使用主窗口来处理请求（简化版本）
-                    println!("📨 接收到消息内容: {}", message.content);
-                    println!("🔄 正在使用主窗口显示消息...");
-
                     if let Some(window) = app_handle.get_webview_window("main") {
-                        println!("✅ 找到主窗口，正在发送消息...");
-
                         // 显示并聚焦主窗口
-                        if let Err(e) = window.show() {
-                            eprintln!("❌ 显示主窗口失败: {}", e);
-                        } else {
-                            println!("✅ 主窗口显示成功");
-                        }
-
-                        if let Err(e) = window.set_focus() {
-                            eprintln!("❌ 设置主窗口焦点失败: {}", e);
-                        } else {
-                            println!("✅ 主窗口焦点设置成功");
-                        }
-
-                        if let Err(e) = window.set_always_on_top(true) {
-                            eprintln!("❌ 设置主窗口置顶失败: {}", e);
-                        } else {
-                            println!("✅ 主窗口置顶设置成功");
-                        }
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                        let _ = window.set_always_on_top(true);
 
                         // 发送消息到主窗口
                         let message_clone = message.clone();
                         let window_clone = window.clone();
                         tokio::spawn(async move {
-                            println!("⏳ 等待500毫秒后发送消息到主窗口...");
                             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-                            match window_clone.emit("new-request", &message_clone) {
-                                Ok(_) => println!("✅ 成功发送消息到主窗口"),
-                                Err(e) => eprintln!("❌ 发送消息到主窗口失败: {}", e),
-                            }
+                            let _ = window_clone.emit("new-request", &message_clone);
                         });
 
                         // 发送系统通知
-                        println!("🔔 正在发送系统通知...");
-                        let notification_result = Notification::new()
+                        let _ = Notification::new()
                             .summary("AI Review - 新消息")
                             .body(&format!("收到新消息: {}", &message.content))
                             .icon("dialog-information")
                             .timeout(5000) // 5秒后自动消失
                             .show();
-
-                        match notification_result {
-                            Ok(_) => println!("✅ 系统通知发送成功"),
-                            Err(e) => eprintln!("❌ 系统通知发送失败: {}", e),
-                        }
                     } else {
-                        eprintln!("❌ 主窗口未找到!");
-
                         // 尝试创建新窗口作为最后的备选方案
-                        println!("🔄 尝试创建新窗口作为备选方案...");
                         let window_label = format!("review-{}", message.id);
 
-                        match tauri::WebviewWindowBuilder::new(
+                        if let Ok(window) = tauri::WebviewWindowBuilder::new(
                             &app_handle,
                             &window_label,
                             tauri::WebviewUrl::App("index.html".into())
@@ -388,26 +324,20 @@ async fn start_ipc_server(app_handle: AppHandle) -> Result<()> {
                         .center()
                         .resizable(true)
                         .build() {
-                            Ok(window) => {
-                                println!("✅ 成功创建备选窗口: {}", window_label);
-                                let _ = window.show();
-                                let _ = window.set_focus();
+                            let _ = window.show();
+                            let _ = window.set_focus();
 
-                                let message_clone = message.clone();
-                                let window_clone = window.clone();
-                                tokio::spawn(async move {
-                                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                                    let _ = window_clone.emit("new-request", &message_clone);
-                                });
-                            }
-                            Err(e) => {
-                                eprintln!("❌ 创建备选窗口失败: {}", e);
-                            }
+                            let message_clone = message.clone();
+                            let window_clone = window.clone();
+                            tokio::spawn(async move {
+                                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                                let _ = window_clone.emit("new-request", &message_clone);
+                            });
                         }
                     }
                 }
                 _ => {
-                    println!("接收到非请求类型消息: {:?}", message);
+                    // 静默处理非请求类型消息
                 }
             }
         }
@@ -441,29 +371,23 @@ async fn main() -> Result<()> {
             // 加载配置
             tauri::async_runtime::spawn(async move {
                 if let Some(state) = app_handle.try_state::<AppState>() {
-                    if let Err(e) = load_config(&state, &app_handle).await {
-                        eprintln!("❌ 加载配置失败: {}", e);
-                    }
+                    let _ = load_config(&state, &app_handle).await;
                 }
             });
 
             // 自动安装CLI命令
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = auto_install_cli_on_startup(&app_handle_cli).await {
-                    eprintln!("❌ 自动安装CLI命令失败: {}", e);
-                }
+                let _ = auto_install_cli_on_startup(&app_handle_cli).await;
             });
 
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = start_ipc_server(app_handle_clone).await {
-                    eprintln!("❌ 启动IPC服务器失败: {}", e);
-                }
+                let _ = start_ipc_server(app_handle_clone).await;
             });
 
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("❌ 运行Tauri应用失败");
+        .expect("应用启动失败");
 
     Ok(())
 }
