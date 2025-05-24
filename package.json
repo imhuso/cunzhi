@@ -1,18 +1,24 @@
 {
   "name": "ai-review-frontend",
-  "version": "0.1.0",
   "type": "module",
+  "version": "0.1.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint . --fix"
   },
   "dependencies": {
-    "vue": "^3.4.0",
-    "@tauri-apps/api": "^1.5.0"
+    "@ant-design/icons-vue": "^7.0.1",
+    "@tauri-apps/api": "^1.5.0",
+    "ant-design-vue": "^4.2.6",
+    "vue": "^3.4.0"
   },
   "devDependencies": {
+    "@antfu/eslint-config": "^4.13.2",
     "@vitejs/plugin-vue": "^5.0.0",
+    "eslint": "^9.27.0",
+    "eslint-plugin-format": "^1.0.1",
     "vite": "^5.0.0"
   }
 }
