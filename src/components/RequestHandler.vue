@@ -4,84 +4,90 @@
       <!-- 请求头部 -->
       <div class="request-header">
         <div class="header-icon">📨</div>
-        <h3>正在处理请求</h3>
+        <h3>收到新消息</h3>
         <div class="request-id">ID: {{ request.id.slice(0, 8) }}...</div>
       </div>
 
-      <!-- 消息内容 -->
-      <div class="message-section">
-        <div class="message-bubble">
-          <div class="message-content">
-            {{ request.content }}
+      <!-- 可滚动内容区域 -->
+      <div class="scrollable-content">
+        <!-- 消息内容 -->
+        <div class="message-section">
+          <div class="message-bubble">
+            <div class="message-content">
+              {{ request.content }}
+            </div>
+            <div class="message-time">
+              {{ formatTime(new Date()) }}
+            </div>
           </div>
-          <div class="message-time">
-            {{ formatTime(new Date()) }}
+        </div>
+
+        <!-- 超时信息 -->
+        <div v-if="request.timeout" class="timeout-section">
+          <div class="timeout-indicator" :class="{ 'urgent': remainingTime <= 10 }">
+            <span class="timeout-icon">⏱️</span>
+            <span class="timeout-text">
+              剩余时间: {{ remainingTime }}秒
+            </span>
+            <div class="timeout-progress">
+              <div
+                class="progress-bar"
+                :style="{ width: progressPercentage + '%' }"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 回复区域 -->
+        <div class="response-section">
+          <label for="response-input" class="response-label">
+            💬 您的回复:
+          </label>
+          <textarea
+            id="response-input"
+            v-model="responseText"
+            class="input textarea response-input"
+            placeholder="请输入您的回复..."
+            :disabled="isProcessing"
+            @keydown="handleKeydown"
+            ref="textareaRef"
+          ></textarea>
+
+          <div class="char-count" :class="{ 'warning': responseText.length > 1000 }">
+            {{ responseText.length }}/1000 字符
           </div>
         </div>
       </div>
 
-      <!-- 超时信息 -->
-      <div v-if="request.timeout" class="timeout-section">
-        <div class="timeout-indicator" :class="{ 'urgent': remainingTime <= 10 }">
-          <span class="timeout-icon">⏱️</span>
-          <span class="timeout-text">
-            剩余时间: {{ remainingTime }}秒
-          </span>
-          <div class="timeout-progress">
-            <div
-              class="progress-bar"
-              :style="{ width: progressPercentage + '%' }"
-            ></div>
-          </div>
+      <!-- 固定底部操作区域 -->
+      <div class="action-footer">
+        <!-- 操作按钮 -->
+        <div class="action-buttons">
+          <button
+            class="btn btn-secondary"
+            @click="handleCancel"
+            :disabled="isProcessing"
+          >
+            <span class="btn-icon">❌</span>
+            取消
+          </button>
+
+          <button
+            class="btn btn-primary"
+            @click="handleSend"
+            :disabled="!responseText.trim() || isProcessing"
+          >
+            <span class="btn-icon">✅</span>
+            {{ isProcessing ? '发送中...' : '发送回复' }}
+          </button>
         </div>
-      </div>
 
-      <!-- 回复区域 -->
-      <div class="response-section">
-        <label for="response-input" class="response-label">
-          您的回复:
-        </label>
-        <textarea
-          id="response-input"
-          v-model="responseText"
-          class="input textarea response-input"
-          placeholder="请输入您的回复..."
-          :disabled="isProcessing"
-          @keydown="handleKeydown"
-          ref="textareaRef"
-        ></textarea>
-
-        <div class="char-count" :class="{ 'warning': responseText.length > 1000 }">
-          {{ responseText.length }}/1000
+        <!-- 快捷键提示 -->
+        <div class="shortcuts-hint">
+          <small>
+            💡 快捷键: Ctrl/Cmd + Enter 发送 | Escape 取消
+          </small>
         </div>
-      </div>
-
-      <!-- 操作按钮 -->
-      <div class="action-buttons">
-        <button
-          class="btn btn-secondary"
-          @click="handleCancel"
-          :disabled="isProcessing"
-        >
-          <span class="btn-icon">❌</span>
-          取消
-        </button>
-
-        <button
-          class="btn btn-primary"
-          @click="handleSend"
-          :disabled="!responseText.trim() || isProcessing"
-        >
-          <span class="btn-icon">✅</span>
-          {{ isProcessing ? '发送中...' : '发送回复' }}
-        </button>
-      </div>
-
-      <!-- 快捷键提示 -->
-      <div class="shortcuts-hint">
-        <small>
-          💡 快捷键: Ctrl/Cmd + Enter 发送 | Escape 取消
-        </small>
       </div>
     </div>
   </div>
@@ -192,25 +198,46 @@ const handleGlobalKeydown = (event) => {
 
 <style scoped>
 .request-container {
-  padding: 20px;
+  padding: 16px;
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .request-card {
   width: 100%;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
+  height: 100%;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(20px);
   animation: slideUp 0.4s ease-out;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .request-header {
   text-align: center;
-  margin-bottom: 25px;
-  padding-bottom: 20px;
+  padding: 20px 20px 15px 20px;
   border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+  flex-shrink: 0;
+}
+
+.scrollable-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  padding-bottom: 10px;
+}
+
+.action-footer {
+  flex-shrink: 0;
+  background: rgba(248, 249, 250, 0.8);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  backdrop-filter: blur(10px);
 }
 
 .header-icon {
@@ -232,15 +259,16 @@ const handleGlobalKeydown = (event) => {
 }
 
 .message-section {
-  margin-bottom: 25px;
+  margin-bottom: 20px;
 }
 
 .message-bubble {
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-radius: 16px;
-  padding: 20px;
-  border-left: 4px solid #667eea;
+  border-radius: 18px;
+  padding: 24px;
+  border-left: 5px solid #667eea;
   position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .message-content {
@@ -258,16 +286,17 @@ const handleGlobalKeydown = (event) => {
 }
 
 .timeout-section {
-  margin-bottom: 25px;
+  margin-bottom: 20px;
 }
 
 .timeout-indicator {
-  background: rgba(255, 193, 7, 0.1);
-  border: 1px solid rgba(255, 193, 7, 0.3);
-  border-radius: 12px;
-  padding: 15px;
+  background: rgba(255, 193, 7, 0.12);
+  border: 2px solid rgba(255, 193, 7, 0.4);
+  border-radius: 16px;
+  padding: 18px;
   text-align: center;
   transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 193, 7, 0.1);
 }
 
 .timeout-indicator.urgent {
@@ -303,22 +332,31 @@ const handleGlobalKeydown = (event) => {
 }
 
 .response-section {
-  margin-bottom: 25px;
+  margin-bottom: 0;
 }
 
 .response-label {
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   color: #333;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 16px;
 }
 
 .response-input {
-  min-height: 120px;
+  min-height: 100px;
+  max-height: 200px;
   resize: vertical;
   font-size: 14px;
   line-height: 1.5;
+  border-radius: 12px;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  transition: all 0.3s ease;
+}
+
+.response-input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
 }
 
 .char-count {
@@ -335,20 +373,52 @@ const handleGlobalKeydown = (event) => {
 
 .action-buttons {
   display: flex;
-  gap: 15px;
+  gap: 16px;
   justify-content: flex-end;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
+}
+
+.action-buttons .btn {
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 12px;
+  min-width: 120px;
+  transition: all 0.3s ease;
+}
+
+.action-buttons .btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.action-buttons .btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.action-buttons .btn-secondary {
+  background: rgba(108, 117, 125, 0.1);
+  color: #6c757d;
+  border: 2px solid rgba(108, 117, 125, 0.2);
+}
+
+.action-buttons .btn-secondary:hover:not(:disabled) {
+  background: rgba(108, 117, 125, 0.15);
+  border-color: rgba(108, 117, 125, 0.3);
+  transform: translateY(-1px);
 }
 
 .btn-icon {
-  font-size: 14px;
+  font-size: 16px;
+  margin-right: 4px;
 }
 
 .shortcuts-hint {
   text-align: center;
   color: #666;
-  padding-top: 15px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 13px;
+  opacity: 0.8;
 }
 
 @keyframes slideUp {
@@ -368,6 +438,45 @@ const handleGlobalKeydown = (event) => {
   }
   50% {
     box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+  }
+}
+
+/* 滚动条样式 */
+.scrollable-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollable-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.scrollable-content::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.3);
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.scrollable-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.5);
+}
+
+/* 响应式设计 */
+@media (max-height: 600px) {
+  .request-header {
+    padding: 15px 20px 10px 20px;
+  }
+
+  .scrollable-content {
+    padding: 15px 20px 10px 20px;
+  }
+
+  .action-footer {
+    padding: 15px 20px;
+  }
+
+  .response-input {
+    min-height: 80px;
   }
 }
 </style>
