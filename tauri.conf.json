@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "AI Review",
-        "width": 800,
-        "height": 600,
-        "minWidth": 600,
-        "minHeight": 400,
+        "width": 600,
+        "height": 650,
+        "minWidth": 500,
+        "minHeight": 450,
         "center": true,
         "visible": true,
         "alwaysOnTop": false,
@@ -55,9 +55,7 @@
     "resources": [
       "scripts/postinstall.sh"
     ],
-    "externalBin": [
-      "target/release/ai-review-cli"
-    ],
+
     "copyright": "",
     "category": "DeveloperTool",
     "shortDescription": "AI Review Tool",

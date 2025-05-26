@@ -9,8 +9,8 @@ name = "ai-review-ui"
 path = "src/main.rs"
 
 [[bin]]
-name = "ai-review-cli"
-path = "src/cli.rs"
+name = "ai-review-mcp"
+path = "src/mcp_server_bin.rs"
 
 [dependencies]
 tauri = { version = "2.0", features = [
@@ -22,11 +22,7 @@ serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
 tokio = { version = "1.0", features = [ "full" ] }
 anyhow = "1.0"
-clap = { version = "4.0", features = [ "derive" ] }
 uuid = { version = "1.0", features = [ "v4" ] }
-dirs = "5.0"
-interprocess = "1.2"
-notify-rust = "4.0"
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }

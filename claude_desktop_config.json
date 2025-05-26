@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ai-review": {
+      "command": "ai-review-mcp",
+      "args": []
+    }
+  }
+}

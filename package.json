@@ -14,15 +14,22 @@
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
+    "@f3ve/vue-markdown-it": "^0.2.3",
     "@tauri-apps/api": "^2.5.0",
+    "@types/markdown-it": "^14.1.2",
     "ant-design-vue": "^4.2.6",
+    "markdown-it": "^14.1.0",
     "vue": "^3.5.14"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.13.2",
+    "@tailwindcss/vite": "^4.1.7",
     "@vitejs/plugin-vue": "^5.2.4",
+    "autoprefixer": "^10.4.21",
     "eslint": "^9.27.0",
     "eslint-plugin-format": "^1.0.1",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.1.7",
     "vite": "^5.4.19"
   },
   "packageManager": "pnpm@10.11.0+sha512.6540583f41cc5f628eb3d9773ecee802f4f9ef9923cc45b69890fb47991d4b092964694ec3a4f738a420c918a333062c8b925d312f42e4f0c263eb603551f977"

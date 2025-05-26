@@ -1,33 +1,27 @@
 use anyhow::Result;
-use notify_rust::Notification;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{mpsc, Mutex};
-use tauri::{AppHandle, Emitter, Manager, State};
-use tokio::sync::mpsc as tokio_mpsc;
-
-mod ipc;
-
-use ipc::{IpcServer, Message, MessageType};
+use std::sync::Mutex;
+use tauri::{AppHandle, Manager, State, Emitter};
+use std::time::Duration;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct AppConfig {
     init_prompt: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpPopupRequest {
+    pub id: String,
+    pub message: String,
+    pub predefined_options: Option<Vec<String>>,
+    pub is_markdown: bool,
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            // # 交互式任务规则
-
-            // - 需要了解参数时使用 `ai-review-cli help` 命令
-            // - 遇到问题或不确定时必须通过 `ai-review-cli [message] --timeout` 询问，等待回复
-            // - 如果超时没有任何输出，默认为我对你做了正面的响应
-            // - 聊天结束时必须运行 `ai-review-cli 你觉得我当前的任务是否已经完成`，不要自主/自以为完成了任务或结束对话，必须得到用户认可
-            // - 然后在恢复对话之前检索输入值。
-
             init_prompt: "# 交互式任务规则\n\n- 需要了解参数时使用 `ai-review-cli help` 命令\n- 遇到问题或不确定时必须通过 `ai-review-cli [message] --timeout` 询问，等待回复\n- 如果超时没有任何输出，默认为我对你做了正面的响应\n- 聊天结束时必须运行 `ai-review-cli 你觉得我当前的任务是否已经完成`，不要自主/自以为完成了任务或结束对话，必须得到用户认可\n- 然后在恢复对话之前检索输入值。".to_string(),
         }
     }
@@ -35,36 +29,17 @@ impl Default for AppConfig {
 
 #[derive(Debug)]
 struct AppState {
-    pending_requests: Mutex<HashMap<String, mpsc::Sender<String>>>,
     config: Mutex<AppConfig>,
+    response_channel: Mutex<Option<tokio::sync::oneshot::Sender<String>>>,
 }
 
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            pending_requests: Mutex::new(HashMap::new()),
             config: Mutex::new(AppConfig::default()),
+            response_channel: Mutex::new(None),
         }
     }
-}
-
-#[tauri::command]
-async fn respond_to_request(
-    request_id: String,
-    response: String,
-    state: State<'_, AppState>,
-    window: tauri::Window,
-) -> Result<(), String> {
-    let mut pending = state.pending_requests.lock().unwrap();
-    if let Some(sender) = pending.remove(&request_id) {
-        sender.send(response).map_err(|_| "Failed to send response".to_string())?;
-
-        // 如果是弹窗窗口，关闭它
-        if window.label().starts_with("review-") {
-            let _ = window.close();
-        }
-    }
-    Ok(())
 }
 
 #[tauri::command]
@@ -73,28 +48,24 @@ async fn get_app_info() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn close_popup_window(window: tauri::Window) -> Result<(), String> {
-    if window.label().starts_with("review-") {
-        window.close().map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
 async fn get_init_prompt(state: State<'_, AppState>) -> Result<String, String> {
-    let config = state.config.lock().unwrap();
+    let config = state.config.lock().map_err(|e| format!("获取配置失败: {}", e))?;
     Ok(config.init_prompt.clone())
 }
 
 #[tauri::command]
 async fn set_init_prompt(prompt: String, state: State<'_, AppState>, app: tauri::AppHandle) -> Result<(), String> {
+    if prompt.trim().is_empty() {
+        return Err("提示词不能为空".to_string());
+    }
+
     {
-        let mut config = state.config.lock().unwrap();
-        config.init_prompt = prompt;
+        let mut config = state.config.lock().map_err(|e| format!("获取配置失败: {}", e))?;
+        config.init_prompt = prompt.trim().to_string();
     }
 
     // 保存配置到文件
-    save_config(&state, &app).await.map_err(|e| e.to_string())?;
+    save_config(&state, &app).await.map_err(|e| format!("保存配置失败: {}", e))?;
     Ok(())
 }
 
@@ -102,117 +73,70 @@ async fn set_init_prompt(prompt: String, state: State<'_, AppState>, app: tauri:
 async fn reset_init_prompt(state: State<'_, AppState>, app: tauri::AppHandle) -> Result<String, String> {
     let default_prompt = AppConfig::default().init_prompt;
     {
-        let mut config = state.config.lock().unwrap();
+        let mut config = state.config.lock().map_err(|e| format!("获取配置失败: {}", e))?;
         config.init_prompt = default_prompt.clone();
     }
 
     // 保存配置到文件
-    save_config(&state, &app).await.map_err(|e| e.to_string())?;
+    save_config(&state, &app).await.map_err(|e| format!("保存配置失败: {}", e))?;
     Ok(default_prompt)
 }
 
 #[tauri::command]
-async fn check_ipc_status() -> Result<bool, String> {
-    use std::os::unix::net::UnixStream;
-    let socket_path = ipc::get_socket_path();
-
-    match UnixStream::connect(&socket_path) {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
-}
-
-#[tauri::command]
-async fn install_cli_command(app: tauri::AppHandle) -> Result<String, String> {
-    install_cli_symlink(&app).await.map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn check_cli_installed() -> Result<bool, String> {
-    let cli_path = "/usr/local/bin/ai-review-cli";
-    Ok(std::path::Path::new(cli_path).exists())
-}
-
-async fn install_cli_symlink(app: &tauri::AppHandle) -> Result<String> {
-    use std::process::Command;
-
-    // 获取当前应用的路径
-    let app_path = std::env::current_exe()
-        .map_err(|e| anyhow::anyhow!("无法获取应用路径: {}", e))?;
-
-    let app_dir = app_path.parent()
-        .ok_or_else(|| anyhow::anyhow!("无法获取应用目录"))?;
-
-    // CLI二进制文件在应用bundle中的路径
-    let cli_source = app_dir.join("ai-review-cli");
-    let cli_target = "/usr/local/bin/ai-review-cli";
-
-    // 检查源文件是否存在
-    if !cli_source.exists() {
-        return Err(anyhow::anyhow!("CLI二进制文件不存在: {:?}", cli_source));
+async fn send_mcp_response(response: String, state: State<'_, AppState>) -> Result<(), String> {
+    if response.trim().is_empty() {
+        return Err("响应内容不能为空".to_string());
     }
 
-    // 创建 /usr/local/bin 目录（如果不存在）
-    let output = Command::new("mkdir")
-        .args(["-p", "/usr/local/bin"])
-        .output()
-        .map_err(|e| anyhow::anyhow!("创建目录失败: {}", e))?;
+    // 通过channel发送响应（如果有的话）
+    let sender = {
+        let mut channel = state.response_channel.lock().map_err(|e| format!("获取响应通道失败: {}", e))?;
+        channel.take()
+    };
 
-    if !output.status.success() {
-        return Err(anyhow::anyhow!("创建 /usr/local/bin 目录失败"));
-    }
-
-    // 移除旧的符号链接（如果存在）
-    if std::path::Path::new(cli_target).exists() {
-        let _ = std::fs::remove_file(cli_target);
-    }
-
-    // 创建符号链接
-    let output = Command::new("ln")
-        .args(["-s", &cli_source.to_string_lossy(), cli_target])
-        .output()
-        .map_err(|e| anyhow::anyhow!("创建符号链接失败: {}", e))?;
-
-    if !output.status.success() {
-        let error_msg = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("创建符号链接失败: {}", error_msg));
-    }
-
-    // 设置执行权限
-    let output = Command::new("chmod")
-        .args(["+x", cli_target])
-        .output()
-        .map_err(|e| anyhow::anyhow!("设置执行权限失败: {}", e))?;
-
-    if !output.status.success() {
-        let error_msg = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("设置执行权限失败: {}", error_msg));
-    }
-
-    Ok(format!("CLI命令已成功安装到: {}", cli_target))
-}
-
-async fn auto_install_cli_on_startup(app: &tauri::AppHandle) -> Result<()> {
-    // 检查CLI是否已安装
-    let cli_path = "/usr/local/bin/ai-review-cli";
-    if !std::path::Path::new(cli_path).exists() {
-        match install_cli_symlink(app).await {
-            Ok(_) => {
-                // 发送通知
-                let _ = Notification::new()
-                    .summary("AI Review")
-                    .body("CLI命令已自动安装，您现在可以在终端中使用 'ai-review-cli' 命令")
-                    .icon("dialog-information")
-                    .timeout(5000)
-                    .show();
-            }
-            Err(_) => {
-                // 静默处理安装失败
-            }
-        }
+    if let Some(sender) = sender {
+        let _ = sender.send(response);
     }
 
     Ok(())
+}
+
+#[tauri::command]
+fn get_cli_args() -> Result<serde_json::Value, String> {
+    let args: Vec<String> = std::env::args().collect();
+    let mut result = serde_json::Map::new();
+
+    // 检查是否有 --mcp-request 参数
+    if args.len() >= 3 && args[1] == "--mcp-request" {
+        result.insert("mcp_request".to_string(), serde_json::Value::String(args[2].clone()));
+    }
+
+    Ok(serde_json::Value::Object(result))
+}
+
+#[tauri::command]
+fn read_mcp_request(file_path: String) -> Result<serde_json::Value, String> {
+    if !std::path::Path::new(&file_path).exists() {
+        return Err(format!("文件不存在: {}", file_path));
+    }
+
+    match std::fs::read_to_string(&file_path) {
+        Ok(content) => {
+            if content.trim().is_empty() {
+                return Err("文件内容为空".to_string());
+            }
+            match serde_json::from_str(&content) {
+                Ok(json) => Ok(json),
+                Err(e) => Err(format!("解析JSON失败: {}", e))
+            }
+        }
+        Err(e) => Err(format!("读取文件失败: {}", e))
+    }
+}
+
+#[tauri::command]
+fn exit_app() -> Result<(), String> {
+    std::process::exit(0);
 }
 
 fn get_config_path(app: &AppHandle) -> Result<PathBuf> {
@@ -228,7 +152,8 @@ fn get_config_path(app: &AppHandle) -> Result<PathBuf> {
 
 async fn save_config(state: &State<'_, AppState>, app: &AppHandle) -> Result<()> {
     let config = {
-        let config_guard = state.config.lock().unwrap();
+        let config_guard = state.config.lock()
+            .map_err(|e| anyhow::anyhow!("获取配置锁失败: {}", e))?;
         config_guard.clone()
     };
 
@@ -246,102 +171,10 @@ async fn load_config(state: &State<'_, AppState>, app: &AppHandle) -> Result<()>
         let config_json = fs::read_to_string(config_path)?;
         let config: AppConfig = serde_json::from_str(&config_json)?;
 
-        let mut config_guard = state.config.lock().unwrap();
+        let mut config_guard = state.config.lock()
+            .map_err(|e| anyhow::anyhow!("获取配置锁失败: {}", e))?;
         *config_guard = config;
     }
-
-    Ok(())
-}
-
-async fn start_ipc_server(app_handle: AppHandle) -> Result<()> {
-    let (tx, mut rx) = tokio_mpsc::unbounded_channel::<(Message, mpsc::Sender<String>)>();
-
-    // 启动IPC服务器
-    let server = IpcServer::new(tx)?;
-    tokio::spawn(async move {
-        let _ = server.run().await;
-    });
-
-    // 处理接收到的消息
-    tokio::spawn(async move {
-        while let Some((message, response_sender)) = rx.recv().await {
-            match message.message_type {
-                MessageType::Request => {
-                    // 检查是否是 init 指令
-                    if message.content.trim().eq_ignore_ascii_case("init") {
-                        if let Some(state) = app_handle.try_state::<AppState>() {
-                            let config = state.config.lock().unwrap();
-                            let init_prompt = config.init_prompt.clone();
-                            drop(config); // 释放锁
-
-                            // 直接发送提示词作为响应
-                            let _ = response_sender.send(init_prompt);
-                        } else {
-                            let _ = response_sender.send("错误：无法获取配置".to_string());
-                        }
-                        continue; // 跳过正常的UI处理流程
-                    }
-
-                    // 存储待处理的请求
-                    if let Some(state) = app_handle.try_state::<AppState>() {
-                        let mut pending = state.pending_requests.lock().unwrap();
-                        pending.insert(message.id.clone(), response_sender);
-                    }
-
-                    // 直接使用主窗口来处理请求（简化版本）
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        // 显示并聚焦主窗口
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                        let _ = window.set_always_on_top(true);
-
-                        // 发送消息到主窗口
-                        let message_clone = message.clone();
-                        let window_clone = window.clone();
-                        tokio::spawn(async move {
-                            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                            let _ = window_clone.emit("new-request", &message_clone);
-                        });
-
-                        // 发送系统通知
-                        let _ = Notification::new()
-                            .summary("AI Review - 新消息")
-                            .body(&format!("收到新消息: {}", &message.content))
-                            .icon("dialog-information")
-                            .timeout(5000) // 5秒后自动消失
-                            .show();
-                    } else {
-                        // 尝试创建新窗口作为最后的备选方案
-                        let window_label = format!("review-{}", message.id);
-
-                        if let Ok(window) = tauri::WebviewWindowBuilder::new(
-                            &app_handle,
-                            &window_label,
-                            tauri::WebviewUrl::App("index.html".into())
-                        )
-                        .title("AI Review - 快速回复")
-                        .inner_size(500.0, 400.0)
-                        .center()
-                        .resizable(true)
-                        .build() {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-
-                            let message_clone = message.clone();
-                            let window_clone = window.clone();
-                            tokio::spawn(async move {
-                                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                                let _ = window_clone.emit("new-request", &message_clone);
-                            });
-                        }
-                    }
-                }
-                _ => {
-                    // 静默处理非请求类型消息
-                }
-            }
-        }
-    });
 
     Ok(())
 }
@@ -353,41 +186,101 @@ async fn main() -> Result<()> {
     tauri::Builder::default()
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
-            respond_to_request,
             get_app_info,
-            close_popup_window,
             get_init_prompt,
             set_init_prompt,
             reset_init_prompt,
-            check_ipc_status,
-            install_cli_command,
-            check_cli_installed
+            send_mcp_response,
+            get_cli_args,
+            read_mcp_request,
+            exit_app
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
-            let app_handle_clone = app_handle.clone();
-            let app_handle_cli = app_handle.clone();
 
-            // 加载配置
-            tauri::async_runtime::spawn(async move {
-                if let Some(state) = app_handle.try_state::<AppState>() {
-                    let _ = load_config(&state, &app_handle).await;
-                }
-            });
-
-            // 自动安装CLI命令
-            tauri::async_runtime::spawn(async move {
-                let _ = auto_install_cli_on_startup(&app_handle_cli).await;
-            });
-
-            tauri::async_runtime::spawn(async move {
-                let _ = start_ipc_server(app_handle_clone).await;
-            });
+            // 检查命令行参数
+            let args: Vec<String> = std::env::args().collect();
+            if args.len() >= 3 && args[1] == "--mcp-request" {
+                // MCP弹窗模式
+                let request_file = args[2].clone();
+                let app_handle_mcp = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = handle_mcp_popup_mode(app_handle_mcp, &request_file).await {
+                        eprintln!("MCP弹窗模式处理失败: {}", e);
+                        std::process::exit(1);
+                    }
+                });
+            } else {
+                // 正常模式 - 只加载配置，不启动文件监听
+                let app_handle_normal = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Some(state) = app_handle_normal.try_state::<AppState>() {
+                        if let Err(e) = load_config(&state, &app_handle_normal).await {
+                            eprintln!("加载配置失败: {}", e);
+                        }
+                    }
+                });
+            }
 
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("应用启动失败");
+
+    Ok(())
+}
+
+async fn handle_mcp_popup_mode(app_handle: AppHandle, request_file: &str) -> Result<()> {
+    // 检查请求文件是否存在
+    if !std::path::Path::new(request_file).exists() {
+        return Err(anyhow::anyhow!("MCP请求文件不存在: {}", request_file));
+    }
+
+    // 读取MCP请求数据
+    let request_json = fs::read_to_string(request_file)?;
+    if request_json.trim().is_empty() {
+        return Err(anyhow::anyhow!("MCP请求文件内容为空"));
+    }
+
+    let request: McpPopupRequest = serde_json::from_str(&request_json)?;
+
+    // 设置响应通道
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    if let Some(state) = app_handle.try_state::<AppState>() {
+        let mut channel = state.response_channel.lock()
+            .map_err(|e| anyhow::anyhow!("获取响应通道失败: {}", e))?;
+        *channel = Some(sender);
+    }
+
+    // 等待窗口创建完成
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // 获取主窗口并发送MCP请求事件
+    if let Some(window) = app_handle.get_webview_window("main") {
+        let _ = window.emit("mcp-request", &request);
+        let _ = window.show();
+        let _ = window.set_focus();
+        let _ = window.set_always_on_top(true);
+
+        // 等待用户响应
+        match tokio::time::timeout(Duration::from_secs(60), receiver).await {
+            Ok(Ok(response)) => {
+                println!("{}", response.trim());
+                app_handle.exit(0);
+            }
+            Ok(Err(_)) => {
+                println!("取消");
+                app_handle.exit(0);
+            }
+            Err(_) => {
+                // 超时处理
+                println!("取消");
+                app_handle.exit(0);
+            }
+        }
+    } else {
+        return Err(anyhow::anyhow!("无法获取主窗口"));
+    }
 
     Ok(())
 }
