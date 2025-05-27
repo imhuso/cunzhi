@@ -6,7 +6,7 @@
 
 智能记忆管理：
 - 对话开始时查询 get_project_info 保持一致性（压缩显示项目记忆）
-- 检测"请记住"关键词时使用 process_remember 自动存储
+- 当发现用户输入"请记住："时，要对用户的消息进行总结后调用 memory_manager 的 add 功能添加记忆
 - 使用 add 添加新记忆（content + category: rule/preference/pattern/context）
 - 仅在重要变更时更新记忆，保持简洁
 

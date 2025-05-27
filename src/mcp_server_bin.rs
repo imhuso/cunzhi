@@ -133,8 +133,8 @@ fn handle_tools_list(id: Value) -> JsonRpcResponse {
                         "properties": {
                             "action": {
                                 "type": "string",
-                                "enum": ["add", "get_project_info", "process_remember"],
-                                "description": "操作类型：add(添加记忆), get_project_info(获取项目信息), process_remember(处理请记住关键词)"
+                                "enum": ["add", "get_project_info"],
+                                "description": "操作类型：add(添加记忆), get_project_info(获取项目信息)"
                             },
                             "content": {
                                 "type": "string",
@@ -244,16 +244,7 @@ fn handle_memory_add(manager: &MemoryManager, args: &serde_json::Map<String, Val
 
 
 
-fn handle_memory_process_remember(manager: &MemoryManager, args: &serde_json::Map<String, Value>) -> Result<String> {
-    let content = args.get("content")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("缺少内容参数"))?;
 
-    match manager.process_remember_keyword(content)? {
-        Some(result) => Ok(result),
-        None => Ok("💡 未检测到\"请记住\"关键词，内容未添加到记忆中".to_string()),
-    }
-}
 
 
 
@@ -307,7 +298,6 @@ fn handle_memory_manager(id: Value, arguments: &Value) -> JsonRpcResponse {
                 let result = match action {
                     "add" => handle_memory_add(&manager, args),
                     "get_project_info" => handle_memory_get_project_info(&manager),
-                    "process_remember" => handle_memory_process_remember(&manager, args),
                     _ => Err(anyhow::anyhow!("未知的操作类型: {}", action)),
                 };
 

@@ -136,8 +136,8 @@ Tauri 应用 (Vue + Ant Design)
     "properties": {
       "action": {
         "type": "string",
-        "enum": ["add", "get", "organize", "stats", "get_by_category"],
-        "description": "操作类型"
+        "enum": ["add", "get_project_info"],
+        "description": "操作类型：add(添加记忆), get_project_info(获取项目信息)"
       },
       "content": {
         "type": "string",
@@ -146,39 +146,23 @@ Tauri 应用 (Vue + Ant Design)
       "category": {
         "type": "string",
         "enum": ["rule", "preference", "pattern", "context"],
-        "description": "记忆分类"
-      },
-      "priority": {
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 10,
-        "description": "优先级（1-10，10为最高）",
-        "default": 5
-      },
-      "tags": {
-        "type": "array",
-        "items": {"type": "string"},
-        "description": "标签列表",
-        "default": []
+        "description": "记忆分类：rule(规范规则), preference(用户偏好), pattern(最佳实践), context(项目上下文)"
       },
       "project_path": {
         "type": "string",
-        "description": "项目路径（默认使用当前工作目录）"
+        "description": "项目路径（必需）"
       }
     },
-    "required": ["action"]
+    "required": ["action", "project_path"]
   }
 }
 ```
 
 **功能特性**：
 - ✅ 智能分类存储（规范、偏好、模式、上下文）
-- ✅ 优先级管理（1-10级别）
-- ✅ 标签系统支持
-- ✅ 自动去重和整理
 - ✅ 项目级别记忆隔离
 - ✅ Markdown格式存储
-- ✅ 统计信息查看
+- ✅ 压缩显示项目记忆
 
 **记忆分类说明**：
 - **rule**: 开发规范和规则（如代码风格、命名约定）
@@ -189,17 +173,17 @@ Tauri 应用 (Vue + Ant Design)
 **使用示例**：
 ```bash
 # 添加开发规范
-memory_manager(action="add", content="使用中文回复，代码使用英文", category="rule", priority=9)
+memory_manager(action="add", content="使用中文回复，代码使用英文", category="rule", project_path="/path/to/project")
 
-# 获取所有记忆
-memory_manager(action="get")
+# 获取项目记忆信息
+memory_manager(action="get_project_info", project_path="/path/to/project")
 
-# 整理记忆（去重、精简）
-memory_manager(action="organize")
-
-# 查看统计信息
-memory_manager(action="stats")
+# 添加用户偏好
+memory_manager(action="add", content="用户偏好使用Vue框架", category="preference", project_path="/path/to/project")
 ```
+
+**智能记忆处理**：
+当用户输入包含"请记住："时，AI会自动总结内容并调用memory_manager添加记忆。
 
 ## 🔧 配置
 

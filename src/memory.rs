@@ -358,30 +358,7 @@ impl MemoryManager {
 
 
 
-    /// 处理"请记住"关键词（简化版，由AI处理分类）
-    pub fn process_remember_keyword(&self, content: &str) -> Result<Option<String>> {
-        // 检查是否包含"请记住"关键词
-        if !content.contains("请记住") {
-            return Ok(None);
-        }
 
-        // 提取"请记住"后的内容
-        let parts: Vec<&str> = content.split("请记住").collect();
-        if parts.len() < 2 {
-            return Ok(None);
-        }
-
-        let remember_content = parts[1].trim();
-        if remember_content.is_empty() {
-            return Ok(None);
-        }
-
-        // 使用默认分类，让AI调用方决定具体分类
-        let id = self.add_memory(remember_content, MemoryCategory::Context)?;
-
-        Ok(Some(format!("✅ 已记住: {}\n📝 记忆ID: {}\n💡 请使用memory_manager工具进行分类调整",
-                       remember_content, id)))
-    }
 
 
 }
