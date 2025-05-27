@@ -6,6 +6,9 @@ use std::process::Command;
 use std::fs;
 use uuid::Uuid;
 
+mod memory;
+use memory::{MemoryManager, MemoryCategory};
+
 #[derive(Debug, Serialize, Deserialize)]
 struct PopupRequest {
     id: String,
@@ -121,10 +124,244 @@ fn handle_tools_list(id: Value) -> JsonRpcResponse {
                         },
                         "required": ["message"]
                     }
+                },
+                {
+                    "name": "memory_manager",
+                    "description": "全局记忆管理工具，用于存储和管理重要的开发规范、用户偏好和最佳实践",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "action": {
+                                "type": "string",
+                                "enum": ["add", "get_project_info", "process_remember"],
+                                "description": "操作类型：add(添加记忆), get_project_info(获取项目信息), process_remember(处理请记住关键词)"
+                            },
+                            "content": {
+                                "type": "string",
+                                "description": "记忆内容（add操作时必需）"
+                            },
+                            "category": {
+                                "type": "string",
+                                "enum": ["rule", "preference", "pattern", "context"],
+                                "description": "记忆分类：rule(规范规则), preference(用户偏好), pattern(最佳实践), context(项目上下文)"
+                            },
+
+                            "project_path": {
+                                "type": "string",
+                                "description": "项目路径（必需）"
+                            }
+                        },
+                        "required": ["action", "project_path"]
+                    }
                 }
             ]
         })),
         error: None,
+    }
+}
+
+fn handle_ai_review_chat(id: Value, arguments: &Value) -> JsonRpcResponse {
+    if let Value::Object(args) = arguments {
+        let message = args.get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("No message provided");
+
+        let predefined_options = args.get("predefined_options")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect::<Vec<String>>()
+            });
+
+        let is_markdown = args.get("is_markdown")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        let popup_request = PopupRequest {
+            id: Uuid::new_v4().to_string(),
+            message: message.to_string(),
+            predefined_options,
+            is_markdown,
+        };
+
+        match create_tauri_popup(&popup_request) {
+            Ok(response) => {
+                return JsonRpcResponse {
+                    jsonrpc: "2.0".to_string(),
+                    id,
+                    result: Some(json!({
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": response
+                            }
+                        ]
+                    })),
+                    error: None,
+                };
+            }
+            Err(e) => {
+                eprintln!("弹窗创建失败: {}", e);
+            }
+        }
+    }
+
+    JsonRpcResponse {
+        jsonrpc: "2.0".to_string(),
+        id,
+        result: None,
+        error: Some(json!({
+            "code": -32602,
+            "message": "Invalid ai_review_chat params"
+        })),
+    }
+}
+
+fn handle_memory_add(manager: &MemoryManager, args: &serde_json::Map<String, Value>) -> Result<String> {
+    let content = args.get("content")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("缺少记忆内容"))?;
+
+    let category_str = args.get("category")
+        .and_then(|v| v.as_str())
+        .unwrap_or("context");
+
+    let category = match category_str {
+        "rule" => MemoryCategory::Rule,
+        "preference" => MemoryCategory::Preference,
+        "pattern" => MemoryCategory::Pattern,
+        "context" => MemoryCategory::Context,
+        _ => MemoryCategory::Context,
+    };
+
+    let id = manager.add_memory(content, category)?;
+    Ok(format!("✅ 记忆已添加，ID: {}\n📝 内容: {}\n📂 分类: {:?}",
+               id, content, category))
+}
+
+
+
+
+
+fn handle_memory_process_remember(manager: &MemoryManager, args: &serde_json::Map<String, Value>) -> Result<String> {
+    let content = args.get("content")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("缺少内容参数"))?;
+
+    match manager.process_remember_keyword(content)? {
+        Some(result) => Ok(result),
+        None => Ok("💡 未检测到\"请记住\"关键词，内容未添加到记忆中".to_string()),
+    }
+}
+
+
+
+fn handle_memory_get_project_info(manager: &MemoryManager) -> Result<String> {
+    manager.get_project_info()
+}
+
+
+
+
+
+
+
+fn handle_memory_manager(id: Value, arguments: &Value) -> JsonRpcResponse {
+    if let Value::Object(args) = arguments {
+        let action = args.get("action")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        // 要求调用方明确提供项目路径，不进行自动fallback
+        let project_path = match args.get("project_path").and_then(|v| v.as_str()) {
+            Some(path) => path.to_string(),
+            None => {
+                return JsonRpcResponse {
+                    jsonrpc: "2.0".to_string(),
+                    id,
+                    result: None,
+                    error: Some(json!({
+                        "code": -32602,
+                        "message": "缺少必需的 project_path 参数。请在调用 memory_manager 工具时明确指定项目路径，例如：{\"action\": \"add\", \"project_path\": \"/path/to/your/project\", \"content\": \"...\", \"category\": \"preference\"}"
+                    })),
+                };
+            }
+        };
+
+        // 检查项目路径是否存在
+        if !std::path::Path::new(&project_path).exists() {
+            return JsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                id,
+                result: None,
+                error: Some(json!({
+                    "code": -32602,
+                    "message": format!("项目路径不存在: {}", project_path)
+                })),
+            };
+        }
+
+        match MemoryManager::new(&project_path) {
+            Ok(manager) => {
+                let result = match action {
+                    "add" => handle_memory_add(&manager, args),
+                    "get_project_info" => handle_memory_get_project_info(&manager),
+                    "process_remember" => handle_memory_process_remember(&manager, args),
+                    _ => Err(anyhow::anyhow!("未知的操作类型: {}", action)),
+                };
+
+                match result {
+                    Ok(content) => {
+                        return JsonRpcResponse {
+                            jsonrpc: "2.0".to_string(),
+                            id,
+                            result: Some(json!({
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": content
+                                    }
+                                ]
+                            })),
+                            error: None,
+                        };
+                    }
+                    Err(e) => {
+                        return JsonRpcResponse {
+                            jsonrpc: "2.0".to_string(),
+                            id,
+                            result: None,
+                            error: Some(json!({
+                                "code": -32603,
+                                "message": format!("记忆管理操作失败: {}", e)
+                            })),
+                        };
+                    }
+                }
+            }
+            Err(e) => {
+                return JsonRpcResponse {
+                    jsonrpc: "2.0".to_string(),
+                    id,
+                    result: None,
+                    error: Some(json!({
+                        "code": -32603,
+                        "message": format!("MCP error -32603: 创建记忆管理器失败，项目路径: {}, 错误: {}", project_path, e)
+                    })),
+                };
+            }
+        }
+    }
+
+    JsonRpcResponse {
+        jsonrpc: "2.0".to_string(),
+        id,
+        result: None,
+        error: Some(json!({
+            "code": -32602,
+            "message": "Invalid memory_manager params"
+        })),
     }
 }
 
@@ -134,51 +371,9 @@ fn handle_tools_call(id: Value, params: Option<Value>) -> JsonRpcResponse {
             (map.get("name"), map.get("arguments")) {
 
             if name == "ai_review_chat" {
-                if let Value::Object(args) = arguments {
-                    let message = args.get("message")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("No message provided");
-
-                    let predefined_options = args.get("predefined_options")
-                        .and_then(|v| v.as_array())
-                        .map(|arr| {
-                            arr.iter()
-                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                .collect::<Vec<String>>()
-                        });
-
-                    let is_markdown = args.get("is_markdown")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or(false);
-
-                    let popup_request = PopupRequest {
-                        id: Uuid::new_v4().to_string(),
-                        message: message.to_string(),
-                        predefined_options,
-                        is_markdown,
-                    };
-
-                    match create_tauri_popup(&popup_request) {
-                        Ok(response) => {
-                            return JsonRpcResponse {
-                                jsonrpc: "2.0".to_string(),
-                                id,
-                                result: Some(json!({
-                                    "content": [
-                                        {
-                                            "type": "text",
-                                            "text": response
-                                        }
-                                    ]
-                                })),
-                                error: None,
-                            };
-                        }
-                        Err(e) => {
-                            eprintln!("弹窗创建失败: {}", e);
-                        }
-                    }
-                }
+                return handle_ai_review_chat(id, arguments);
+            } else if name == "memory_manager" {
+                return handle_memory_manager(id, arguments);
             }
         }
     }
@@ -250,10 +445,6 @@ fn handle_request(request: JsonRpcRequest) -> JsonRpcResponse {
 }
 
 fn main() -> Result<()> {
-    eprintln!("🚀 AI Review MCP 服务器已启动，等待连接...");
-    eprintln!("📋 支持的工具: ai_review_chat");
-    eprintln!("🎯 弹窗方式: 直接调用 Tauri 应用");
-
     let stdin = io::stdin();
     let mut stdout = io::stdout();
 
@@ -265,15 +456,12 @@ fn main() -> Result<()> {
 
         match parse_flexible_request(&line) {
             Ok(request) => {
-                eprintln!("📨 收到请求: {}", request.method);
                 let response = handle_request(request);
                 let response_json = serde_json::to_string(&response)?;
                 writeln!(stdout, "{}", response_json)?;
                 stdout.flush()?;
             }
-            Err(e) => {
-                eprintln!("❌ 解析请求失败: {}", e);
-                eprintln!("📄 原始请求: {}", line);
+            Err(_e) => {
 
                 // 尝试从原始JSON中提取id
                 let request_id = match serde_json::from_str::<Value>(&line) {
@@ -289,8 +477,7 @@ fn main() -> Result<()> {
                     result: None,
                     error: Some(json!({
                         "code": -32700,
-                        "message": "Parse error",
-                        "data": format!("Failed to parse JSON-RPC request: {}", e)
+                        "message": "Parse error"
                     })),
                 };
                 let response_json = serde_json::to_string(&error_response)?;

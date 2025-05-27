@@ -9,6 +9,8 @@ export default defineConfig({
     tailwindcss(),
   ],
   clearScreen: false,
+  // Tauri应用需要使用相对路径
+  base: './',
   server: {
     port: 5176,
     strictPort: true,
@@ -22,5 +24,15 @@ export default defineConfig({
     target: process.env.TAURI_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_DEBUG,
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['vue', '@vueuse/core'],
+          antd: ['ant-design-vue'],
+          markdown: ['@f3ve/vue-markdown-it', 'markdown-it']
+        }
+      }
+    }
   },
 })

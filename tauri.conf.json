@@ -19,10 +19,11 @@
         "minHeight": 450,
         "center": true,
         "visible": true,
-        "alwaysOnTop": false,
+        "alwaysOnTop": true,
         "decorations": true,
         "hiddenTitle": true,
         "transparent": false,
+        "skipTaskbar": false,
         "resizable": true,
         "fullscreen": false
       }
@@ -50,7 +51,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg", "app"],
+    "targets": ["app"],
     "icon": [],
     "resources": [
       "scripts/postinstall.sh"

@@ -125,6 +125,7 @@ function closeMcpPopup() {
 
 // 显示MCP弹窗
 function showMcpDialog(request) {
+  console.log('显示MCP弹窗, request:', request)
   mcpRequest.value = request
   showMcpPopup.value = true
 }

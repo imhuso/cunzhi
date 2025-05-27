@@ -17,6 +17,7 @@ pub struct McpPopupRequest {
     pub message: String,
     pub predefined_options: Option<Vec<String>>,
     pub is_markdown: bool,
+    pub timeout: Option<u64>, // 超时时间（秒）
 }
 
 impl Default for AppConfig {
@@ -151,16 +152,18 @@ fn get_config_path(app: &AppHandle) -> Result<PathBuf> {
 }
 
 async fn save_config(state: &State<'_, AppState>, app: &AppHandle) -> Result<()> {
-    let config = {
-        let config_guard = state.config.lock()
-            .map_err(|e| anyhow::anyhow!("获取配置锁失败: {}", e))?;
-        config_guard.clone()
-    };
-
     let config_path = get_config_path(app)?;
-    let config_json = serde_json::to_string_pretty(&config)?;
+    
+    // 确保目录存在
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    
+    let config = state.config.lock().map_err(|e| anyhow::anyhow!("获取配置失败: {}", e))?;
+    let config_json = serde_json::to_string_pretty(&*config)?;
+    
     fs::write(config_path, config_json)?;
-
+    
     Ok(())
 }
 
@@ -181,6 +184,24 @@ async fn load_config(state: &State<'_, AppState>, app: &AppHandle) -> Result<()>
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // 检查程序是如何被调用的
+    let program_name = std::env::args().next()
+        .map(|path| {
+            std::path::Path::new(&path)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("ai-review-ui")
+                .to_string()
+        })
+        .unwrap_or_else(|| "ai-review-ui".to_string());
+
+    // 如果是以 ai-review-mcp 名称调用，提示用户使用独立的MCP服务器
+    if program_name == "ai-review-mcp" {
+        println!("🚀 启动 AI Review MCP 服务器...");
+        println!("请使用独立的 ai-review-mcp 二进制文件");
+        std::process::exit(1);
+    }
+
     let app_state = AppState::default();
 
     tauri::Builder::default()
@@ -257,25 +278,47 @@ async fn handle_mcp_popup_mode(app_handle: AppHandle, request_file: &str) -> Res
 
     // 获取主窗口并发送MCP请求事件
     if let Some(window) = app_handle.get_webview_window("main") {
-        let _ = window.emit("mcp-request", &request);
+        // 确保窗口可见
         let _ = window.show();
         let _ = window.set_focus();
         let _ = window.set_always_on_top(true);
 
-        // 等待用户响应
-        match tokio::time::timeout(Duration::from_secs(60), receiver).await {
-            Ok(Ok(response)) => {
-                println!("{}", response.trim());
-                app_handle.exit(0);
+        // 等待窗口完全显示
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // 发送MCP请求事件
+        window.emit("mcp-request", &request)
+            .map_err(|e| anyhow::anyhow!("发送MCP请求事件失败: {}", e))?;
+
+        // 等待用户响应，根据配置决定是否超时
+        if let Some(timeout_secs) = request.timeout {
+            // 有超时配置，使用配置的超时时间
+            match tokio::time::timeout(Duration::from_secs(timeout_secs), receiver).await {
+                Ok(Ok(response)) => {
+                    println!("{}", response.trim());
+                    app_handle.exit(0);
+                }
+                Ok(Err(_)) => {
+                    println!("取消");
+                    app_handle.exit(0);
+                }
+                Err(_) => {
+                    // 超时处理
+                    println!("完成");
+                    app_handle.exit(0);
+                }
             }
-            Ok(Err(_)) => {
-                println!("取消");
-                app_handle.exit(0);
-            }
-            Err(_) => {
-                // 超时处理
-                println!("取消");
-                app_handle.exit(0);
+        } else {
+            // 无超时配置，无限等待
+            match receiver.await {
+                Ok(response) => {
+                    println!("{}", response.trim());
+                    app_handle.exit(0);
+                }
+                Err(_) => {
+                    println!("取消");
+                    app_handle.exit(0);
+                }
             }
         }
     } else {
