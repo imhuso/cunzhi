@@ -119,7 +119,37 @@ impl MemoryManager {
             return Err(anyhow::anyhow!("项目路径不是目录: {}", canonical_path.display()));
         }
 
-        Ok(canonical_path)
+        // 验证是否为 git 根目录或其子目录
+        if let Some(git_root) = Self::find_git_root(&canonical_path) {
+            // 如果找到了 git 根目录，使用 git 根目录作为项目路径
+            Ok(git_root)
+        } else {
+            return Err(anyhow::anyhow!(
+                "错误：提供的项目路径不在 git 仓库中。\n路径: {}\n请确保在 git 根目录（包含 .git 文件夹的目录）中调用此功能。",
+                canonical_path.display()
+            ));
+        }
+    }
+
+    /// 查找 git 根目录
+    fn find_git_root(start_path: &Path) -> Option<PathBuf> {
+        let mut current_path = start_path;
+
+        loop {
+            // 检查当前目录是否包含 .git
+            let git_path = current_path.join(".git");
+            if git_path.exists() {
+                return Some(current_path.to_path_buf());
+            }
+
+            // 向上一级目录查找
+            match current_path.parent() {
+                Some(parent) => current_path = parent,
+                None => break, // 已经到达根目录
+            }
+        }
+
+        None
     }
 
     /// 初始化记忆文件结构
