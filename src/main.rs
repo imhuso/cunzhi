@@ -265,6 +265,31 @@ async fn handle_mcp_popup_mode(app_handle: AppHandle, request_file: &str) -> Res
 
     let request: McpPopupRequest = serde_json::from_str(&request_json)?;
 
+    // 尝试建立弹窗连接，支持重连机制
+    let max_retries = 3;
+    for attempt in 1..=max_retries {
+        match try_create_popup_connection(&app_handle, &request, attempt).await {
+            Ok(response) => {
+                println!("{}", response.trim());
+                app_handle.exit(0);
+                return Ok(());
+            }
+            Err(e) if attempt < max_retries => {
+                eprintln!("弹窗连接失败 (尝试 {}/{}): {}", attempt, max_retries, e);
+                // 等待一段时间后重试
+                tokio::time::sleep(Duration::from_millis(1000 * attempt)).await;
+                continue;
+            }
+            Err(e) => {
+                return Err(anyhow::anyhow!("弹窗连接最终失败: {}", e));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn try_create_popup_connection(app_handle: &AppHandle, request: &McpPopupRequest, _attempt: u64) -> Result<String> {
     // 设置响应通道
     let (sender, receiver) = tokio::sync::oneshot::channel();
     if let Some(state) = app_handle.try_state::<AppState>() {
@@ -274,56 +299,93 @@ async fn handle_mcp_popup_mode(app_handle: AppHandle, request_file: &str) -> Res
     }
 
     // 等待窗口创建完成
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
 
     // 获取主窗口并发送MCP请求事件
     if let Some(window) = app_handle.get_webview_window("main") {
-        // 确保窗口可见
+        // 分步骤初始化窗口，避免卡顿
         let _ = window.show();
-        let _ = window.set_focus();
-        let _ = window.set_always_on_top(true);
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
-        // 等待窗口完全显示
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        let _ = window.set_always_on_top(true);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // 等待窗口完全渲染
+        tokio::time::sleep(Duration::from_millis(300)).await;
 
         // 发送MCP请求事件
         window.emit("mcp-request", &request)
             .map_err(|e| anyhow::anyhow!("发送MCP请求事件失败: {}", e))?;
+
+        // 等待事件处理完成后再设置焦点
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let _ = window.set_focus();
 
         // 等待用户响应，根据配置决定是否超时
         if let Some(timeout_secs) = request.timeout {
             // 有超时配置，使用配置的超时时间
             match tokio::time::timeout(Duration::from_secs(timeout_secs), receiver).await {
                 Ok(Ok(response)) => {
-                    println!("{}", response.trim());
-                    app_handle.exit(0);
+                    if response.trim() == "CANCELLED" {
+                        return Err(anyhow::anyhow!("用户取消了操作"));
+                    }
+                    Ok(response)
                 }
                 Ok(Err(_)) => {
-                    println!("取消");
-                    app_handle.exit(0);
+                    Err(anyhow::anyhow!("响应通道异常关闭，可能需要重试"))
                 }
                 Err(_) => {
-                    // 超时处理
-                    println!("完成");
-                    app_handle.exit(0);
+                    // 超时处理 - 返回默认完成消息
+                    Ok("完成".to_string())
                 }
             }
         } else {
-            // 无超时配置，无限等待
-            match receiver.await {
-                Ok(response) => {
-                    println!("{}", response.trim());
-                    app_handle.exit(0);
+            // 无超时配置，使用健康检查的无限等待
+            wait_for_response_with_health_check(receiver, app_handle).await
+        }
+    } else {
+        Err(anyhow::anyhow!("无法获取主窗口"))
+    }
+}
+
+async fn wait_for_response_with_health_check(
+    mut receiver: tokio::sync::oneshot::Receiver<String>,
+    app_handle: &AppHandle
+) -> Result<String> {
+    // 使用健康检查的无限等待
+    let health_check_interval = Duration::from_secs(30); // 每30秒检查一次
+
+    loop {
+        tokio::select! {
+            // 等待用户响应
+            result = &mut receiver => {
+                match result {
+                    Ok(response) => {
+                        if response.trim() == "CANCELLED" {
+                            return Err(anyhow::anyhow!("用户取消了操作"));
+                        }
+                        return Ok(response);
+                    }
+                    Err(_) => {
+                        return Err(anyhow::anyhow!("响应通道异常关闭，建议重试"));
+                    }
                 }
-                Err(_) => {
-                    println!("取消");
-                    app_handle.exit(0);
+            }
+            // 健康检查
+            _ = tokio::time::sleep(health_check_interval) => {
+                // 检查窗口是否仍然存在和可见
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    if let Ok(is_visible) = window.is_visible() {
+                        if !is_visible {
+                            // 窗口不可见，尝试重新显示
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                } else {
+                    return Err(anyhow::anyhow!("主窗口丢失，需要重试"));
                 }
             }
         }
-    } else {
-        return Err(anyhow::anyhow!("无法获取主窗口"));
     }
-
-    Ok(())
 }

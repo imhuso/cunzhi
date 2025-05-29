@@ -63,13 +63,21 @@ fn create_tauri_popup(request: &PopupRequest) -> Result<String> {
 
     if output.status.success() {
         let response = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if response == "CANCELLED" || response.is_empty() {
+        if response == "CANCELLED" {
             return Err(anyhow::anyhow!("用户取消了操作"));
+        }
+        if response.is_empty() {
+            return Err(anyhow::anyhow!("与ai-review-ui连接失败,请重试!"));
         }
         Ok(response)
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
-        Err(anyhow::anyhow!("Tauri弹窗失败: {}", error))
+        // 检查是否是连接相关的错误，提示重试
+        if error.contains("连接失败") || error.contains("通道异常") || error.contains("需要重试") {
+            Err(anyhow::anyhow!("弹窗连接异常，建议重试: {}", error))
+        } else {
+            Err(anyhow::anyhow!("弹窗创建失败: {}", error))
+        }
     }
 }
 

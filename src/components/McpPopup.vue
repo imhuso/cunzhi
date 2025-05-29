@@ -112,9 +112,14 @@
           <div class="flex items-center gap-4">
 
 
-            <!-- 提示文字 -->
-            <div class="text-sm text-gray-600 dark:text-gray-400">
-              {{ request.predefined_options ? '选择选项或输入文本，至少一个' : '⌘+回车 快速发送' }}
+            <!-- 连接状态 -->
+            <div class="flex items-center gap-2 text-sm">
+              <div class="w-2 h-2 rounded-full bg-green-500"></div>
+              <span class="text-gray-600 dark:text-gray-400">{{ connectionStatus }}</span>
+              <span class="text-gray-400 dark:text-gray-500">|</span>
+              <span class="text-gray-500 dark:text-gray-400">
+                {{ request.predefined_options ? '选择选项或输入文本' : '⌘+回车 快速发送' }}
+              </span>
             </div>
           </div>
 
@@ -202,6 +207,7 @@ const submitting = ref(false)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const loading = ref(true)
 const draggedImages = ref<string[]>([]) // 拖拽的图片
+const connectionStatus = ref('已连接') // 连接状态
 
 
 
@@ -411,20 +417,22 @@ const setupCodeCopy = () => {
 
 // 生命周期
 onMounted(() => {
-  // 立即加载完成
-  loading.value = false
+  // 延迟加载完成，确保DOM完全渲染
+  setTimeout(() => {
+    loading.value = false
 
-  // 设置代码复制功能
-  nextTick(() => {
-    setupCodeCopy()
-  })
+    // 等待下一个渲染周期后设置功能
+    nextTick(() => {
+      setupCodeCopy()
 
-  // 聚焦到输入框（如果有）
-  nextTick(() => {
-    if (!props.request.predefined_options && textareaRef.value) {
-      textareaRef.value.focus()
-    }
-  })
+      // 再等待一个周期后处理焦点，避免与窗口焦点冲突
+      setTimeout(() => {
+        if (!props.request.predefined_options && textareaRef.value) {
+          textareaRef.value.focus()
+        }
+      }, 100)
+    })
+  }, 150) // 给组件更多时间完成渲染
 
   // 清空输入
   userInput.value = ''
