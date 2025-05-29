@@ -161,60 +161,163 @@ fn handle_tools_list(id: Value) -> JsonRpcResponse {
 }
 
 fn handle_ai_review_chat(id: Value, arguments: &Value) -> JsonRpcResponse {
-    if let Value::Object(args) = arguments {
-        let message = args.get("message")
-            .and_then(|v| v.as_str())
-            .unwrap_or("No message provided");
+    // 详细的参数验证和错误处理
+    match arguments {
+        Value::Object(args) => {
+            // 验证必需的message参数
+            let message = match args.get("message") {
+                Some(Value::String(msg)) => {
+                    if msg.trim().is_empty() {
+                        eprintln!("错误: message参数不能为空字符串");
+                        return JsonRpcResponse {
+                            jsonrpc: "2.0".to_string(),
+                            id,
+                            result: None,
+                            error: Some(json!({
+                                "code": -32602,
+                                "message": "Invalid ai_review_chat params: message不能为空"
+                            })),
+                        };
+                    }
+                    msg.clone()
+                }
+                Some(_) => {
+                    eprintln!("错误: message参数必须是字符串类型");
+                    return JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id,
+                        result: None,
+                        error: Some(json!({
+                            "code": -32602,
+                            "message": "Invalid ai_review_chat params: message必须是字符串类型"
+                        })),
+                    };
+                }
+                None => {
+                    eprintln!("错误: 缺少必需的message参数");
+                    return JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id,
+                        result: None,
+                        error: Some(json!({
+                            "code": -32602,
+                            "message": "Invalid ai_review_chat params: 缺少必需的message参数"
+                        })),
+                    };
+                }
+            };
 
-        let predefined_options = args.get("predefined_options")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect::<Vec<String>>()
-            });
-
-        let is_markdown = args.get("is_markdown")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-
-        let popup_request = PopupRequest {
-            id: Uuid::new_v4().to_string(),
-            message: message.to_string(),
-            predefined_options,
-            is_markdown,
-        };
-
-        match create_tauri_popup(&popup_request) {
-            Ok(response) => {
-                return JsonRpcResponse {
-                    jsonrpc: "2.0".to_string(),
-                    id,
-                    result: Some(json!({
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": response
+            // 验证可选的predefined_options参数
+            let predefined_options = match args.get("predefined_options") {
+                Some(Value::Array(arr)) => {
+                    let options: Result<Vec<String>, String> = arr.iter()
+                        .enumerate()
+                        .map(|(i, v)| {
+                            match v.as_str() {
+                                Some(s) => Ok(s.to_string()),
+                                None => Err(format!("predefined_options[{}]必须是字符串类型", i))
                             }
-                        ]
-                    })),
-                    error: None,
-                };
-            }
-            Err(e) => {
-                eprintln!("弹窗创建失败: {}", e);
+                        })
+                        .collect();
+
+                    match options {
+                        Ok(opts) => Some(opts),
+                        Err(err) => {
+                            eprintln!("错误: {}", err);
+                            return JsonRpcResponse {
+                                jsonrpc: "2.0".to_string(),
+                                id,
+                                result: None,
+                                error: Some(json!({
+                                    "code": -32602,
+                                    "message": format!("Invalid ai_review_chat params: {}", err)
+                                })),
+                            };
+                        }
+                    }
+                }
+                Some(_) => {
+                    eprintln!("错误: predefined_options参数必须是数组类型");
+                    return JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id,
+                        result: None,
+                        error: Some(json!({
+                            "code": -32602,
+                            "message": "Invalid ai_review_chat params: predefined_options必须是数组类型"
+                        })),
+                    };
+                }
+                None => None,
+            };
+
+            // 验证可选的is_markdown参数
+            let is_markdown = match args.get("is_markdown") {
+                Some(Value::Bool(b)) => *b,
+                Some(_) => {
+                    eprintln!("错误: is_markdown参数必须是布尔类型");
+                    return JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id,
+                        result: None,
+                        error: Some(json!({
+                            "code": -32602,
+                            "message": "Invalid ai_review_chat params: is_markdown必须是布尔类型"
+                        })),
+                    };
+                }
+                None => false,
+            };
+
+            let popup_request = PopupRequest {
+                id: Uuid::new_v4().to_string(),
+                message,
+                predefined_options,
+                is_markdown,
+            };
+
+            match create_tauri_popup(&popup_request) {
+                Ok(response) => {
+                    JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id,
+                        result: Some(json!({
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": response
+                                }
+                            ]
+                        })),
+                        error: None,
+                    }
+                }
+                Err(e) => {
+                    eprintln!("弹窗创建失败: {}", e);
+                    JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id,
+                        result: None,
+                        error: Some(json!({
+                            "code": -32603,
+                            "message": format!("弹窗创建失败: {}", e)
+                        })),
+                    }
+                }
             }
         }
-    }
-
-    JsonRpcResponse {
-        jsonrpc: "2.0".to_string(),
-        id,
-        result: None,
-        error: Some(json!({
-            "code": -32602,
-            "message": "Invalid ai_review_chat params"
-        })),
+        _ => {
+            eprintln!("错误: arguments参数必须是对象类型");
+            JsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                id,
+                result: None,
+                error: Some(json!({
+                    "code": -32602,
+                    "message": "Invalid ai_review_chat params: arguments必须是对象类型"
+                })),
+            }
+        }
     }
 }
 
