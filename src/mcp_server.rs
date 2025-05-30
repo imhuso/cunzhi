@@ -17,9 +17,11 @@ pub struct AIReviewChatRequest {
     #[schemars(description = "要显示给用户的消息")]
     pub message: String,
     #[schemars(description = "预定义的选项列表（可选）")]
-    pub predefined_options: Option<Vec<String>>,
+    #[serde(default)]
+    pub predefined_options: Vec<String>,
     #[schemars(description = "消息是否为Markdown格式")]
-    pub is_markdown: Option<bool>,
+    #[serde(default)]
+    pub is_markdown: bool,
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -29,9 +31,15 @@ pub struct MemoryManagerRequest {
     #[schemars(description = "项目路径（必需）")]
     pub project_path: String,
     #[schemars(description = "记忆内容（add操作时必需）")]
-    pub content: Option<String>,
+    #[serde(default)]
+    pub content: String,
     #[schemars(description = "记忆分类：rule(规范规则), preference(用户偏好), pattern(最佳实践), context(项目上下文)")]
-    pub category: Option<String>,
+    #[serde(default = "default_category")]
+    pub category: String,
+}
+
+fn default_category() -> String {
+    "context".to_string()
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -58,13 +66,15 @@ impl AIReviewServer {
         &self,
         #[tool(aggr)] request: AIReviewChatRequest,
     ) -> Result<CallToolResult, McpError> {
-        let is_markdown = request.is_markdown.unwrap_or(false);
-        
         let popup_request = PopupRequest {
             id: Uuid::new_v4().to_string(),
             message: request.message,
-            predefined_options: request.predefined_options,
-            is_markdown,
+            predefined_options: if request.predefined_options.is_empty() { 
+                None 
+            } else { 
+                Some(request.predefined_options) 
+            },
+            is_markdown: request.is_markdown,
         };
 
         match create_tauri_popup(&popup_request) {
@@ -95,12 +105,11 @@ impl AIReviewServer {
 
         let result = match request.action.as_str() {
             "add" => {
-                let content = request.content.ok_or_else(|| {
-                    McpError::invalid_params("缺少记忆内容".to_string(), None)
-                })?;
-                let category_str = request.category.unwrap_or_else(|| "context".to_string());
+                if request.content.trim().is_empty() {
+                    return Err(McpError::invalid_params("缺少记忆内容".to_string(), None));
+                }
                 
-                let category = match category_str.as_str() {
+                let category = match request.category.as_str() {
                     "rule" => MemoryCategory::Rule,
                     "preference" => MemoryCategory::Preference,
                     "pattern" => MemoryCategory::Pattern,
@@ -108,10 +117,10 @@ impl AIReviewServer {
                     _ => MemoryCategory::Context,
                 };
 
-                let id = manager.add_memory(&content, category)
+                let id = manager.add_memory(&request.content, category)
                     .map_err(|e| McpError::internal_error(format!("添加记忆失败: {}", e), None))?;
                 
-                format!("✅ 记忆已添加，ID: {}\n📝 内容: {}\n📂 分类: {:?}", id, content, category)
+                format!("✅ 记忆已添加，ID: {}\n📝 内容: {}\n📂 分类: {:?}", id, request.content, category)
             }
             "get_project_info" => {
                 manager.get_project_info()

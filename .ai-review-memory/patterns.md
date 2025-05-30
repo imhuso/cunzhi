@@ -1,2 +1,4 @@
 # 常用模式和最佳实践
 
+- 使用serde的default属性和运行时默认值处理来解决MCP JSON Schema类型兼容性问题
+- 成功修复了所有MCP工具的JSON Schema类型错误。解决方案是将Option<String>和Option<bool>字段改为String和bool字段，使用serde的default属性，避免了schemars与MCP客户端的类型定义不兼容问题。现在memory_manager和ai_review_chat工具都能正常工作。
