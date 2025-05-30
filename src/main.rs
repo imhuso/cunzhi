@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State, Emitter};
 use std::time::Duration;
+use std::os::unix::fs as unix_fs;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct AppConfig {
@@ -182,6 +183,108 @@ async fn load_config(state: &State<'_, AppState>, app: &AppHandle) -> Result<()>
     Ok(())
 }
 
+/// 创建命令行工具的软链接
+async fn create_cli_symlinks() -> Result<()> {
+    // 只在 macOS 上执行
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        
+        // 获取当前应用的路径
+        let current_exe = std::env::current_exe()?;
+        
+        // 检查是否在 App Bundle 中运行
+        if let Some(app_bundle_path) = get_app_bundle_path(&current_exe) {
+            let bin_dir = "/usr/local/bin";
+            let ui_binary = current_exe;
+            let mcp_binary = app_bundle_path.join("Contents/Resources/ai-review-mcp");
+            
+            // 检查 MCP 二进制文件是否存在
+            if !mcp_binary.exists() {
+                println!("⚠️  MCP 二进制文件不存在，跳过软链接创建: {:?}", mcp_binary);
+                return Ok(());
+            }
+            
+            // 检查 /usr/local/bin 目录是否存在且可写
+            if !std::path::Path::new(bin_dir).exists() {
+                println!("📁 创建 {} 目录...", bin_dir);
+                let output = Command::new("sudo")
+                    .args(&["mkdir", "-p", bin_dir])
+                    .output();
+                    
+                if let Err(e) = output {
+                    println!("⚠️  无法创建 bin 目录: {}", e);
+                    return Ok(());
+                }
+            }
+            
+            // 创建软链接
+            let ui_link = format!("{}/ai-review-ui", bin_dir);
+            let mcp_link = format!("{}/ai-review-mcp", bin_dir);
+            
+            // 移除旧的软链接
+            let _ = std::fs::remove_file(&ui_link);
+            let _ = std::fs::remove_file(&mcp_link);
+            
+            // 尝试创建软链接
+            match unix_fs::symlink(&ui_binary, &ui_link) {
+                Ok(_) => println!("✅ 创建 UI 软链接: {} -> {:?}", ui_link, ui_binary),
+                Err(e) => {
+                    // 如果普通用户无权限，尝试使用 sudo
+                    println!("🔐 需要管理员权限创建软链接...");
+                    let output = Command::new("sudo")
+                        .args(&["ln", "-sf", &ui_binary.to_string_lossy(), &ui_link])
+                        .output();
+                        
+                    match output {
+                        Ok(result) if result.status.success() => {
+                            println!("✅ 创建 UI 软链接: {}", ui_link);
+                        }
+                        _ => println!("⚠️  无法创建 UI 软链接: {}", e),
+                    }
+                }
+            }
+            
+            match unix_fs::symlink(&mcp_binary, &mcp_link) {
+                Ok(_) => println!("✅ 创建 MCP 软链接: {} -> {:?}", mcp_link, mcp_binary),
+                Err(e) => {
+                    // 如果普通用户无权限，尝试使用 sudo
+                    let output = Command::new("sudo")
+                        .args(&["ln", "-sf", &mcp_binary.to_string_lossy(), &mcp_link])
+                        .output();
+                        
+                    match output {
+                        Ok(result) if result.status.success() => {
+                            println!("✅ 创建 MCP 软链接: {}", mcp_link);
+                        }
+                        _ => println!("⚠️  无法创建 MCP 软链接: {}", e),
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+/// 获取 App Bundle 的路径
+#[cfg(target_os = "macos")]
+fn get_app_bundle_path(current_exe: &std::path::Path) -> Option<std::path::PathBuf> {
+    let mut path = current_exe;
+    
+    // 向上查找直到找到 .app 目录
+    while let Some(parent) = path.parent() {
+        if let Some(name) = parent.file_name() {
+            if name.to_string_lossy().ends_with(".app") {
+                return Some(parent.to_path_buf());
+            }
+        }
+        path = parent;
+    }
+    
+    None
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // 检查程序是如何被调用的
@@ -218,6 +321,13 @@ async fn main() -> Result<()> {
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
+
+            // 创建命令行工具的软链接
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = create_cli_symlinks().await {
+                    eprintln!("创建软链接失败: {}", e);
+                }
+            });
 
             // 检查命令行参数
             let args: Vec<String> = std::env::args().collect();

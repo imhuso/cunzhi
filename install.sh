@@ -19,10 +19,6 @@ if [[ "$OSTYPE" != "darwin"* ]]; then
     exit 1
 fi
 
-# 构建项目
-echo "📦 构建前端..."
-pnpm build
-
 echo "🔨 构建 Tauri 应用包..."
 cargo tauri build
 
@@ -81,14 +77,16 @@ echo ""
 echo "📝 配置 MCP 客户端："
 echo "将以下内容添加到您的 MCP 客户端配置中："
 echo ""
-echo '{
+cat << 'EOF'
+{
   "mcpServers": {
     "ai-review": {
       "command": "ai-review-mcp",
       "args": []
     }
   }
-}'
+}
+EOF
 echo ""
 echo "🔗 命令行工具已链接到 /usr/local/bin/"
 echo "📁 应用位置: /Applications/AI Review.app"

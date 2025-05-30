@@ -10,7 +10,11 @@ path = "src/main.rs"
 
 [[bin]]
 name = "ai-review-mcp"
-path = "src/mcp_server_bin.rs"
+path = "src/mcp_server.rs"
+
+
+
+
 
 [dependencies]
 tauri = { version = "2.0", features = [
@@ -25,6 +29,10 @@ anyhow = "1.0"
 uuid = { version = "1.0", features = [ "v4" ] }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "5.0"
+rmcp = { version = "0.1", features = ["server", "transport-io"] }
+schemars = "0.8"
+
+
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
