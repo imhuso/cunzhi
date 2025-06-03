@@ -1,6 +1,6 @@
 <template>
-  <div class="fixed inset-0 flex flex-col z-50 dark bg-dark-primary">
-    <div class="relative w-full h-full flex flex-col bg-white dark:bg-dark-primary shadow-xl">
+  <div class="fixed inset-0 flex flex-col z-50 dark bg-dark-primary popup-container">
+    <div class="relative w-full h-full flex flex-col bg-white dark:bg-dark-primary shadow-xl popup-content">
 
       <!-- 内容区域 -->
       <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-dark-primary"
@@ -19,14 +19,14 @@
         </div>
 
         <!-- 消息显示区域 -->
-        <div v-else-if="request && request.message"
+        <div v-else-if="request?.message"
           class="mb-4">
           <div
             class="bg-white dark:bg-dark-secondary rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
             <div class="leading-relaxed text-sm markdown-content text-gray-900 dark:text-gray-100 text-left">
-              <vue-markdown-it :source="request.message"
-                :options="markdownOptions"
-                v-if="request.is_markdown" />
+              <vue-markdown-it v-if="request.is_markdown"
+                :source="request.message"
+                :options="markdownOptions" />
               <div v-else
                 class="whitespace-pre-wrap text-left">{{ request.message }}</div>
             </div>
@@ -51,7 +51,7 @@
             <div class="grid gap-2">
               <label v-for="(option, index) in request.predefined_options"
                 :key="`option-${index}`"
-                class="checkbox flex items-center p-3 rounded-lg transition-colors group bg-white hover:bg-blue-50 dark:bg-dark-secondary dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 cursor-pointer">
+                class="checkbox flex items-center p-3 rounded-lg transition-all duration-200 group bg-white hover:bg-blue-50 dark:bg-dark-secondary dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 cursor-pointer smooth-option">
                 <input type="checkbox"
                   :value="option"
                   v-model="selectedOptions"
@@ -99,7 +99,7 @@
             v-model="userInput"
             :placeholder="request.predefined_options ? '您可以在这里添加补充说明...' : '请输入您的回复...'"
             :rows="request.predefined_options ? 3 : 5"
-            class="textarea"
+            class="textarea smooth-textarea"
             :disabled="submitting"
             @keydown.meta.enter="submitInput"
             @keydown.stop
@@ -128,7 +128,7 @@
             <!-- 继续按钮 -->
             <button @click="handleContinue"
               :disabled="submitting"
-              class="btn btn-success"
+              class="btn btn-success smooth-button"
               :class="submitting ? 'opacity-50' : ''">
               <span class="text-xs">▶</span>
               <span class="text-sm">继续</span>
@@ -138,7 +138,7 @@
             <button @click="handleSubmit"
               :disabled="!canSubmit || submitting"
               :class="[
-                'btn',
+                'btn smooth-button',
                 canSubmit && !submitting ? 'btn-primary' : 'bg-gray-300 text-gray-500 dark:bg-gray-600 dark:text-gray-400'
               ]">
               <!-- 加载动画 -->
@@ -187,15 +187,20 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const loading = ref(false)
 const draggedImages = ref<string[]>([])
 
-// 计算属性
+// 计算属性 - 优化版本，减少不必要的计算
 const canSubmit = computed(() => {
-  if (props.request?.predefined_options && props.request.predefined_options.length > 0) {
-    return selectedOptions.value.length > 0 || userInput.value.trim()
+  const hasOptions = selectedOptions.value.length > 0
+  const hasInput = userInput.value.trim().length > 0
+  const hasImages = draggedImages.value.length > 0
+
+  if (props.request?.predefined_options?.length) {
+    return hasOptions || hasInput
   }
-  return userInput.value.trim() || draggedImages.value.length > 0
+  return hasInput || hasImages
 })
 
-const connectionStatus = computed(() => '已连接')
+// 静态值，避免重复计算
+const connectionStatus = '已连接'
 
 // Markdown 配置
 const markdownOptions = {
@@ -380,53 +385,118 @@ const setupInlineCodeCopy = () => {
   })
 }
 
-// 设置代码复制功能
+// 设置代码复制功能 - 优化版本，使用防抖避免重复执行
+let setupCodeCopyTimer: number | null = null
 const setupCodeCopy = () => {
-  nextTick(() => {
-    const preElements = document.querySelectorAll('.markdown-content pre')
-    preElements.forEach(createCopyButton)
-    setupInlineCodeCopy()
-  })
-}
-
-// 设置焦点的函数
-const setInputFocus = () => {
-  if (textareaRef.value) {
-    textareaRef.value.focus()
+  // 清除之前的定时器，避免重复执行
+  if (setupCodeCopyTimer) {
+    clearTimeout(setupCodeCopyTimer)
   }
+
+  setupCodeCopyTimer = window.setTimeout(() => {
+    nextTick(() => {
+      const preElements = document.querySelectorAll('.markdown-content pre')
+      preElements.forEach(createCopyButton)
+      setupInlineCodeCopy()
+    })
+  }, 50) // 短暂延迟，让DOM稳定后再执行
 }
 
-// 生命周期
+// 生命周期 - 优化版本，确保丝滑体验
 onMounted(() => {
-  // 立即设置代码复制功能
-  setupCodeCopy()
-  
-  // 延迟设置焦点，确保DOM完全渲染
-  setTimeout(() => {
-    setInputFocus()
-  }, 100)
-  
-  // 额外的焦点确保机制
-  setTimeout(() => {
-    if (document.activeElement !== textareaRef.value) {
-      setInputFocus()
-    }
-  }, 300)
+  // 使用 requestIdleCallback 在浏览器空闲时设置代码复制功能
+  // 如果不支持则回退到 requestAnimationFrame
+  if (window.requestIdleCallback) {
+    window.requestIdleCallback(() => {
+      setupCodeCopy()
+    })
+  } else {
+    requestAnimationFrame(() => {
+      setupCodeCopy()
+    })
+  }
 })
 
-// 监听request变化，重新设置代码复制和焦点
+// 监听request变化，重新设置代码复制
 watch(() => props.request, () => {
   setupCodeCopy()
-  // 当请求数据更新时，重新设置焦点
-  nextTick(() => {
-    setTimeout(() => {
-      setInputFocus()
-    }, 50)
-  })
+  // 移除自动焦点设置，让用户自然交互
 }, { deep: true })
 </script>
 
 <style scoped>
+/* 弹窗动画 - 确保丝滑体验 */
+.popup-container {
+  animation: fadeIn 0.15s ease-out;
+}
+
+.popup-content {
+  animation: slideIn 0.2s ease-out;
+  transform-origin: center;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* 按钮流畅动画 */
+.smooth-button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0); /* 启用硬件加速 */
+}
+
+.smooth-button:hover:not(:disabled) {
+  transform: translateY(-1px) translateZ(0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.smooth-button:active:not(:disabled) {
+  transform: translateY(0) translateZ(0);
+  transition-duration: 0.1s;
+}
+
+/* 输入框流畅动画 */
+.smooth-textarea {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0); /* 启用硬件加速 */
+}
+
+.smooth-textarea:focus {
+  transform: translateZ(0);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 选项卡流畅动画 */
+.smooth-option {
+  transform: translateZ(0); /* 启用硬件加速 */
+}
+
+.smooth-option:hover {
+  transform: translateY(-1px) translateZ(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.smooth-option:active {
+  transform: translateY(0) translateZ(0);
+  transition-duration: 0.1s;
+}
+
 /* 组件特定样式 */
 .markdown-content {
   text-align: left;
