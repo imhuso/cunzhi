@@ -1,36 +1,40 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gray-50 dark:bg-dark-primary">
     <!-- 主界面 - 仅在非MCP模式下显示 -->
     <template v-if="!isMcpMode">
       <!-- 标题栏 -->
-      <div class="bg-white border-b border-gray-200 px-4 py-3" data-tauri-drag-region>
+      <div class="bg-white dark:bg-dark-secondary border-b border-gray-200 dark:border-gray-700 px-4 py-2" data-tauri-drag-region>
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <RobotOutlined class="text-blue-500 text-lg" />
-            <h1 class="text-base font-medium text-gray-900">AI Review</h1>
+            <span class="text-blue-500 text-base">🤖</span>
+            <h1 class="text-sm font-medium text-gray-900 dark:text-gray-100">AI Review</h1>
           </div>
-          <a-button type="text" size="small" @click="showSettings = true">
-            <SettingOutlined />
-          </a-button>
+          <button
+            type="button"
+            class="btn btn-secondary"
+            @click="showSettings = true"
+          >
+            ⚙️
+          </button>
         </div>
       </div>
 
       <!-- 主内容区域 -->
-      <div class="flex items-center justify-center min-h-[calc(100vh-60px)] p-4">
+      <div class="flex items-center justify-center min-h-[calc(100vh-50px)] p-4">
         <div class="max-w-md w-full text-center">
-          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <RobotOutlined class="text-4xl text-blue-500 mb-4" />
-            <h2 class="text-xl font-semibold text-gray-900 mb-2">AI Review</h2>
-            <p class="text-gray-600 text-sm mb-4">{{ appInfo }}</p>
+          <div class="bg-white dark:bg-dark-secondary rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <span class="text-3xl text-blue-500 mb-3 block">🤖</span>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">AI Review</h2>
+            <p class="text-gray-600 dark:text-gray-400 text-sm mb-3">{{ appInfo }}</p>
 
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <h3 class="text-sm font-medium text-blue-900 mb-2">🚀 服务状态</h3>
-              <p class="text-blue-700 text-sm">MCP服务器已启动，等待连接...</p>
+            <div class="alert alert-info mb-3">
+              <h3 class="text-sm font-medium mb-1">🚀 服务状态</h3>
+              <p class="text-xs">MCP服务器已启动，等待连接...</p>
             </div>
 
-            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h3 class="text-sm font-medium text-green-900 mb-2">📋 支持的工具</h3>
-              <p class="text-green-700 text-sm">ai_review_chat - 智能代码审查交互</p>
+            <div class="alert alert-success">
+              <h3 class="text-sm font-medium mb-1">📋 支持的工具</h3>
+              <p class="text-xs">ai_review_chat - 智能代码审查交互</p>
             </div>
           </div>
         </div>
@@ -57,10 +61,6 @@
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import {
-  RobotOutlined,
-  SettingOutlined
-} from '@ant-design/icons-vue'
 import McpPopup from './components/McpPopup.vue'
 import SettingsModal from './components/SettingsModal.vue'
 

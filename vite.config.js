@@ -29,7 +29,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['vue', '@vueuse/core'],
-          antd: ['ant-design-vue'],
           markdown: ['@f3ve/vue-markdown-it', 'markdown-it']
         }
       }

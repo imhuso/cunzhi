@@ -31,7 +31,19 @@ export default {
           700: '#1d4ed8',
           800: '#1e40af',
           900: '#1e3a8a',
+        },
+        dark: {
+          primary: '#1f1f2b',
+          secondary: '#272b3a',
         }
+      },
+      fontSize: {
+        'xs': ['0.75rem', { lineHeight: '1rem' }],
+        'sm': ['0.875rem', { lineHeight: '1.25rem' }], 
+        'base': ['0.875rem', { lineHeight: '1.375rem' }], // 缩小基础字体
+        'lg': ['1rem', { lineHeight: '1.5rem' }],
+        'xl': ['1.125rem', { lineHeight: '1.75rem' }],
+        '2xl': ['1.25rem', { lineHeight: '1.75rem' }],
       }
     },
   },
