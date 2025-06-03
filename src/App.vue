@@ -4,37 +4,54 @@
     <template v-if="!isMcpMode">
       <!-- 标题栏 -->
       <div class="bg-white dark:bg-dark-secondary border-b border-gray-200 dark:border-gray-700 px-4 py-2" data-tauri-drag-region>
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-center">
           <div class="flex items-center gap-2">
             <span class="text-blue-500 text-base">🤖</span>
             <h1 class="text-sm font-medium text-gray-900 dark:text-gray-100">AI Review</h1>
           </div>
-          <button
-            type="button"
-            class="btn btn-secondary"
-            @click="showSettings = true"
-          >
-            ⚙️
-          </button>
         </div>
       </div>
 
       <!-- 主内容区域 -->
-      <div class="flex items-center justify-center min-h-[calc(100vh-50px)] p-4">
-        <div class="max-w-md w-full text-center">
-          <div class="bg-white dark:bg-dark-secondary rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-            <span class="text-3xl text-blue-500 mb-3 block">🤖</span>
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">AI Review</h2>
-            <p class="text-gray-600 dark:text-gray-400 text-sm mb-3">{{ appInfo }}</p>
-
-            <div class="alert alert-info mb-3">
-              <h3 class="text-sm font-medium mb-1">🚀 服务状态</h3>
-              <p class="text-xs">MCP服务器已启动，等待连接...</p>
+      <div class="flex items-center justify-center min-h-[calc(100vh-46px)] p-4">
+        <div class="max-w-lg w-full text-center">
+          <div class="bg-white dark:bg-dark-secondary rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
+            <div class="mb-6">
+              <span class="text-5xl text-blue-500 mb-4 block">🤖</span>
+              <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">AI Review</h2>
+              <p class="text-gray-600 dark:text-gray-400 text-sm">{{ appInfo }}</p>
             </div>
 
-            <div class="alert alert-success">
-              <h3 class="text-sm font-medium mb-1">📋 支持的工具</h3>
-              <p class="text-xs">ai_review_chat - 智能代码审查交互</p>
+            <div class="space-y-4">
+              <div class="alert alert-info">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🚀</span>
+                  <div class="text-left">
+                    <h3 class="text-sm font-medium mb-1">服务状态</h3>
+                    <p class="text-xs opacity-80">MCP服务器已启动，等待连接...</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">📋</span>
+                  <div class="text-left">
+                    <h3 class="text-sm font-medium mb-1">支持的工具</h3>
+                    <p class="text-xs opacity-80">ai_review_chat - 智能代码审查交互</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">💡</span>
+                  <div class="text-left">
+                    <h3 class="text-sm font-medium mb-1">使用提示</h3>
+                    <p class="text-xs opacity-80">在Claude Desktop中通过MCP协议调用此服务</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -48,12 +65,6 @@
       @response="handleMcpResponse"
       @cancel="handleMcpCancel"
     />
-
-    <!-- 设置弹窗 -->
-    <SettingsModal
-      v-model:visible="showSettings"
-      @close="showSettings = false"
-    />
   </div>
 </template>
 
@@ -62,11 +73,9 @@ import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import McpPopup from './components/McpPopup.vue'
-import SettingsModal from './components/SettingsModal.vue'
 
 // 响应式数据
 const appInfo = ref('AI Review App v0.1.0')
-const showSettings = ref(false)
 const mcpRequest = ref(null)
 const showMcpPopup = ref(false)
 const isMcpMode = ref(false)
