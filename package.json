@@ -2,6 +2,7 @@
   "name": "ai-review-frontend",
   "type": "module",
   "version": "0.1.0",
+  "packageManager": "pnpm@10.11.0+sha512.6540583f41cc5f628eb3d9773ecee802f4f9ef9923cc45b69890fb47991d4b092964694ec3a4f738a420c918a333062c8b925d312f42e4f0c263eb603551f977",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -30,6 +31,5 @@
     "postcss": "^8.5.3",
     "tailwindcss": "^4.1.7",
     "vite": "^5.4.19"
-  },
-  "packageManager": "pnpm@10.11.0+sha512.6540583f41cc5f628eb3d9773ecee802f4f9ef9923cc45b69890fb47991d4b092964694ec3a4f738a420c918a333062c8b925d312f42e4f0c263eb603551f977"
+  }
 }

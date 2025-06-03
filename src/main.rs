@@ -85,8 +85,12 @@ async fn reset_init_prompt(state: State<'_, AppState>, app: tauri::AppHandle) ->
 }
 
 #[tauri::command]
-async fn send_mcp_response(response: String, state: State<'_, AppState>) -> Result<(), String> {
-    if response.trim().is_empty() {
+async fn send_mcp_response(response: serde_json::Value, state: State<'_, AppState>) -> Result<(), String> {
+    // 将响应序列化为JSON字符串
+    let response_str = serde_json::to_string(&response)
+        .map_err(|e| format!("序列化响应失败: {}", e))?;
+
+    if response_str.trim().is_empty() {
         return Err("响应内容不能为空".to_string());
     }
 
@@ -97,7 +101,7 @@ async fn send_mcp_response(response: String, state: State<'_, AppState>) -> Resu
     };
 
     if let Some(sender) = sender {
-        let _ = sender.send(response);
+        let _ = sender.send(response_str);
     }
 
     Ok(())
@@ -408,27 +412,18 @@ async fn try_create_popup_connection(app_handle: &AppHandle, request: &McpPopupR
         *channel = Some(sender);
     }
 
-    // 等待窗口创建完成
-    tokio::time::sleep(Duration::from_millis(300)).await;
-
     // 获取主窗口并发送MCP请求事件
     if let Some(window) = app_handle.get_webview_window("main") {
-        // 分步骤初始化窗口，避免卡顿
+        // 立即显示窗口和设置属性
         let _ = window.show();
-        tokio::time::sleep(Duration::from_millis(100)).await;
-
         let _ = window.set_always_on_top(true);
-        tokio::time::sleep(Duration::from_millis(100)).await;
-
-        // 等待窗口完全渲染
-        tokio::time::sleep(Duration::from_millis(300)).await;
-
-        // 发送MCP请求事件
+        
+        // 先发送事件，后设置焦点
         window.emit("mcp-request", &request)
             .map_err(|e| anyhow::anyhow!("发送MCP请求事件失败: {}", e))?;
-
-        // 等待事件处理完成后再设置焦点
-        tokio::time::sleep(Duration::from_millis(200)).await;
+            
+        // 延迟设置焦点，让Vue组件有时间初始化
+        tokio::time::sleep(Duration::from_millis(100)).await;
         let _ = window.set_focus();
 
         // 等待用户响应，根据配置决定是否超时

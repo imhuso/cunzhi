@@ -1,7 +1,7 @@
 import process from 'node:process'
+import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
-import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [
@@ -29,9 +29,9 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['vue', '@vueuse/core'],
-          markdown: ['@f3ve/vue-markdown-it', 'markdown-it']
-        }
-      }
-    }
+          markdown: ['@f3ve/vue-markdown-it', 'markdown-it'],
+        },
+      },
+    },
   },
 })

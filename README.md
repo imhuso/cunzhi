@@ -103,7 +103,7 @@ Tauri 应用 (Vue + Ant Design)
       },
       "predefined_options": {
         "type": "array",
-        "items": {"type": "string"},
+        "items": { "type": "string" },
         "description": "预定义的选项列表（可选，支持多选）"
       },
       "is_markdown": {
@@ -118,6 +118,7 @@ Tauri 应用 (Vue + Ant Design)
 ```
 
 **功能特性**：
+
 - ✅ 预定义选项多选支持
 - ✅ 自由文本输入
 - ✅ Markdown 格式消息渲染
@@ -159,18 +160,21 @@ Tauri 应用 (Vue + Ant Design)
 ```
 
 **功能特性**：
+
 - ✅ 智能分类存储（规范、偏好、模式、上下文）
 - ✅ 项目级别记忆隔离
 - ✅ Markdown格式存储
 - ✅ 压缩显示项目记忆
 
 **记忆分类说明**：
+
 - **rule**: 开发规范和规则（如代码风格、命名约定）
 - **preference**: 用户偏好设置（如技术选择、UI偏好）
 - **pattern**: 常用模式和最佳实践（如设计模式、架构模式）
 - **context**: 项目上下文信息（如项目背景、特殊要求）
 
 **使用示例**：
+
 ```bash
 # 添加开发规范
 memory_manager(action="add", content="使用中文回复，代码使用英文", category="rule", project_path="/path/to/project")
@@ -284,11 +288,13 @@ echo '{
 ### 常见问题
 
 1. **弹窗无法启动**
+
    - 确保 `popup.html` 文件存在
    - 检查 Python 3 是否安装
    - 确认浏览器可以打开本地文件
 
 2. **MCP 服务器无响应**
+
    - 检查可执行文件是否存在：`./target/release/ai-review-mcp`
    - 运行 `cargo build --release` 重新构建
    - 查看错误日志

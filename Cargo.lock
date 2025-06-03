@@ -2674,10 +2674,9 @@ dependencies = [
 [[package]]
 name = "rmcp"
 version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33a0110d28bd076f39e14bfd5b0340216dd18effeb5d02b43215944cc3e5c751"
+source = "git+https://github.com/modelcontextprotocol/rust-sdk?branch=main#a66f66ae345a0fafde1e2ee496ec137d77aef82a"
 dependencies = [
- "base64 0.21.7",
+ "base64 0.22.1",
  "chrono",
  "futures",
  "paste",
@@ -2695,11 +2694,11 @@ dependencies = [
 [[package]]
 name = "rmcp-macros"
 version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6e2b2fd7497540489fa2db285edd43b7ed14c49157157438664278da6e42a7a"
+source = "git+https://github.com/modelcontextprotocol/rust-sdk?branch=main#a66f66ae345a0fafde1e2ee496ec137d77aef82a"
 dependencies = [
  "proc-macro2",
  "quote",
+ "serde_json",
  "syn 2.0.101",
 ]
 
@@ -2745,6 +2744,7 @@ version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
 dependencies = [
+ "chrono",
  "dyn-clone",
  "indexmap 1.9.3",
  "schemars_derive",

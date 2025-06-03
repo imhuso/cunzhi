@@ -3,8 +3,9 @@ let messageContainer = null
 
 // 创建消息容器
 function createMessageContainer() {
-  if (messageContainer) return messageContainer
-  
+  if (messageContainer)
+    return messageContainer
+
   messageContainer = document.createElement('div')
   messageContainer.className = 'fixed top-4 right-4 z-[9999] flex flex-col gap-2'
   document.body.appendChild(messageContainer)
@@ -14,7 +15,7 @@ function createMessageContainer() {
 // 创建单个消息
 function createMessage(content, type = 'info', duration = 3000) {
   const container = createMessageContainer()
-  
+
   const messageEl = document.createElement('div')
   messageEl.className = `
     px-4 py-2 rounded-lg shadow-lg text-sm font-medium
@@ -22,22 +23,22 @@ function createMessage(content, type = 'info', duration = 3000) {
     flex items-center gap-2 max-w-sm
     ${getTypeStyles(type)}
   `
-  
+
   // 添加图标和内容
   const icon = getIcon(type)
   messageEl.innerHTML = `
     <span class="flex-shrink-0">${icon}</span>
     <span class="flex-1">${content}</span>
   `
-  
+
   container.appendChild(messageEl)
-  
+
   // 触发进入动画
   requestAnimationFrame(() => {
     messageEl.style.transform = 'translateX(0)'
     messageEl.style.opacity = '1'
   })
-  
+
   // 自动移除
   setTimeout(() => {
     messageEl.style.transform = 'translateX(full)'
@@ -82,4 +83,4 @@ export const message = {
   error: (content, duration) => createMessage(content, 'error', duration),
   warning: (content, duration) => createMessage(content, 'warning', duration),
   info: (content, duration) => createMessage(content, 'info', duration),
-} 
+}

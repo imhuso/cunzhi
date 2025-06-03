@@ -1,140 +1,48 @@
-<template>
-  <div class="min-h-screen bg-gray-50 dark:bg-dark-primary">
-    <!-- 主界面 - 仅在非MCP模式下显示 -->
-    <template v-if="!isMcpMode">
-      <!-- 标题栏 -->
-      <div class="bg-white dark:bg-dark-secondary border-b border-gray-200 dark:border-gray-700 px-4 py-2" data-tauri-drag-region>
-        <div class="flex items-center justify-center">
-          <div class="flex items-center gap-2">
-            <span class="text-blue-500 text-base">🤖</span>
-            <h1 class="text-sm font-medium text-gray-900 dark:text-gray-100">AI Review</h1>
-          </div>
-        </div>
-      </div>
-
-      <!-- 主内容区域 -->
-      <div class="flex items-center justify-center min-h-[calc(100vh-46px)] p-4">
-        <div class="max-w-lg w-full text-center">
-          <div class="bg-white dark:bg-dark-secondary rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
-            <div class="mb-6">
-              <span class="text-5xl text-blue-500 mb-4 block">🤖</span>
-              <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">AI Review</h2>
-              <p class="text-gray-600 dark:text-gray-400 text-sm">{{ appInfo }}</p>
-            </div>
-
-            <div class="space-y-4">
-              <div class="alert alert-info">
-                <div class="flex items-center gap-2">
-                  <span class="text-lg">🚀</span>
-                  <div class="text-left">
-                    <h3 class="text-sm font-medium mb-1">服务状态</h3>
-                    <p class="text-xs opacity-80">MCP服务器已启动，等待连接...</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="alert alert-success">
-                <div class="flex items-center gap-2">
-                  <span class="text-lg">📋</span>
-                  <div class="text-left">
-                    <h3 class="text-sm font-medium mb-1">支持的工具</h3>
-                    <p class="text-xs opacity-80">ai_review_chat - 智能代码审查交互</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="alert alert-warning">
-                <div class="flex items-center gap-2">
-                  <span class="text-lg">💡</span>
-                  <div class="text-left">
-                    <h3 class="text-sm font-medium mb-1">使用提示</h3>
-                    <p class="text-xs opacity-80">在Claude Desktop中通过MCP协议调用此服务</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </template>
-
-    <!-- MCP弹窗 -->
-    <McpPopup
-      v-if="showMcpPopup && mcpRequest"
-      :request="mcpRequest"
-      @response="handleMcpResponse"
-      @cancel="handleMcpCancel"
-    />
-  </div>
-</template>
-
 <script setup>
-import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { onMounted, ref } from 'vue'
 import McpPopup from './components/McpPopup.vue'
 
 // 响应式数据
-const appInfo = ref('AI Review App v0.1.0')
 const mcpRequest = ref(null)
 const showMcpPopup = ref(false)
-const isMcpMode = ref(false)
+const isDarkMode = ref(false)
 
-// 获取应用信息
-async function getAppInfo() {
-  try {
-    appInfo.value = await invoke('get_app_info')
-  } catch (error) {
-    console.error('获取应用信息失败:', error)
-    appInfo.value = 'AI Review App v0.1.0'
-  }
+// 强制应用暗黑主题
+function setupDarkMode() {
+  // 始终应用暗黑主题
+  isDarkMode.value = true
+  document.documentElement.classList.add('dark')
+  localStorage.setItem('theme', 'dark')
 }
 
 // 统一的MCP响应处理
 async function handleMcpResponse(response) {
-  console.log('MCP响应:', response)
-
   try {
-    if (isMcpMode.value) {
-      // MCP模式下，通过Tauri命令发送响应并退出应用
-      await invoke('send_mcp_response', { response })
-      await invoke('exit_app')
-    } else {
-      // 普通模式下，只关闭弹窗
-      closeMcpPopup()
-    }
-  } catch (error) {
+    // 通过Tauri命令发送响应并退出应用
+    await invoke('send_mcp_response', { response })
+    await invoke('exit_app')
+  }
+  catch (error) {
     console.error('处理MCP响应失败:', error)
   }
 }
 
 // 统一的MCP取消处理
 async function handleMcpCancel() {
-  console.log('MCP取消')
-
   try {
-    if (isMcpMode.value) {
-      // MCP模式下，发送取消信息并退出应用
-      await invoke('send_mcp_response', { response: 'CANCELLED' })
-      await invoke('exit_app')
-    } else {
-      // 普通模式下，只关闭弹窗
-      closeMcpPopup()
-    }
-  } catch (error) {
+    // 发送取消信息并退出应用
+    await invoke('send_mcp_response', { response: 'CANCELLED' })
+    await invoke('exit_app')
+  }
+  catch (error) {
     console.error('处理MCP取消失败:', error)
   }
 }
 
-// 关闭MCP弹窗
-function closeMcpPopup() {
-  showMcpPopup.value = false
-  mcpRequest.value = null
-}
-
 // 显示MCP弹窗
 function showMcpDialog(request) {
-  console.log('显示MCP弹窗, request:', request)
   mcpRequest.value = request
   showMcpPopup.value = true
 }
@@ -143,24 +51,18 @@ function showMcpDialog(request) {
 async function checkMcpMode() {
   try {
     const args = await invoke('get_cli_args')
-    console.log('CLI参数:', args)
 
     if (args && args.mcp_request) {
-      console.log('检测到MCP请求文件:', args.mcp_request)
-
-      // 设置为MCP模式
-      isMcpMode.value = true
-
       // 读取MCP请求文件
       const content = await invoke('read_mcp_request', { filePath: args.mcp_request })
-      console.log('MCP请求内容:', content)
 
       if (content) {
         showMcpDialog(content)
       }
       return true // 表示是MCP模式
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('检查MCP请求失败:', error)
   }
   return false // 表示不是MCP模式
@@ -170,51 +72,197 @@ async function checkMcpMode() {
 async function setupMcpEventListener() {
   try {
     await listen('mcp-request', (event) => {
-      console.log('收到MCP请求:', event.payload)
       showMcpDialog(event.payload)
     })
-    console.log('MCP事件监听器设置成功')
-  } catch (error) {
+  }
+  catch (error) {
     console.error('设置MCP事件监听器失败:', error)
   }
 }
 
 // 初始化
 onMounted(async () => {
-  // 检查是否是MCP模式
+  // 首先设置暗黑主题
+  setupDarkMode()
+
+  // 检查是否为MCP模式
   const isMcp = await checkMcpMode()
 
+  // 如果不是MCP模式，设置事件监听器
   if (!isMcp) {
-    // 非MCP模式：获取应用信息并设置事件监听器
-    await getAppInfo()
     await setupMcpEventListener()
   }
 })
 </script>
 
-<style>
-/* 全局样式重置 */
-* {
-  box-sizing: border-box;
+<template>
+  <div
+    id="app"
+    class="min-h-screen bg-dark-primary transition-colors duration-300"
+  >
+    <!-- MCP弹窗 -->
+    <McpPopup
+      v-if="showMcpPopup && mcpRequest"
+      :request="mcpRequest"
+      @response="handleMcpResponse"
+      @cancel="handleMcpCancel"
+    />
+
+    <!-- MCP功能展示界面 -->
+    <div
+      v-else
+      class="flex items-center justify-center min-h-screen p-6"
+    >
+      <div class="max-w-2xl w-full">
+        <!-- 主标题 -->
+        <div class="text-center mb-8">
+          <div
+            class="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
+          >
+            <span class="text-white text-3xl">🤖</span>
+          </div>
+          <h1 class="text-3xl font-bold text-gray-100 mb-2">
+            AI Review MCP
+          </h1>
+          <p class="text-lg text-gray-400">
+            智能代码审查与交互工具
+          </p>
+        </div>
+
+        <!-- 功能卡片 -->
+        <div class="grid gap-6 md:grid-cols-2">
+          <!-- MCP服务器功能 -->
+          <div class="bg-dark-secondary rounded-xl p-6 shadow-lg border border-gray-700">
+            <div class="flex items-center mb-4">
+              <div class="w-12 h-12 bg-blue-900 rounded-lg flex items-center justify-center mr-4">
+                <span class="text-2xl">🔧</span>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-100">
+                  MCP 服务器
+                </h3>
+                <p class="text-sm text-gray-400">
+                  Model Context Protocol
+                </p>
+              </div>
+            </div>
+            <ul class="space-y-2 text-sm text-gray-400">
+              <li class="flex items-center">
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                智能代码审查交互
+              </li>
+              <li class="flex items-center">
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                支持文本和图片输入
+              </li>
+              <li class="flex items-center">
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                预定义选项支持
+              </li>
+              <li class="flex items-center">
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                Markdown 渲染
+              </li>
+            </ul>
+          </div>
+
+          <!-- 记忆管理功能 -->
+          <div class="bg-dark-secondary rounded-xl p-6 shadow-lg border border-gray-700">
+            <div class="flex items-center mb-4">
+              <div class="w-12 h-12 bg-purple-900 rounded-lg flex items-center justify-center mr-4">
+                <span class="text-2xl">🧠</span>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-100">
+                  记忆管理
+                </h3>
+                <p class="text-sm text-gray-400">
+                  智能记忆系统
+                </p>
+              </div>
+            </div>
+            <ul class="space-y-2 text-sm text-gray-400">
+              <li class="flex items-center">
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                开发规范存储
+              </li>
+              <li class="flex items-center">
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                用户偏好记录
+              </li>
+              <li class="flex items-center">
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                项目信息管理
+              </li>
+              <li class="flex items-center">
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                最佳实践收集
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 使用说明 -->
+        <div class="mt-8 bg-gradient-to-r from-blue-900/20 to-purple-900/20 rounded-xl p-6 border border-blue-800">
+          <h3 class="text-lg font-semibold text-gray-100 mb-4 flex items-center">
+            <span class="text-2xl mr-2">📋</span>
+            使用方法
+          </h3>
+          <div class="grid gap-4 md:grid-cols-2 text-sm">
+            <div>
+              <h4 class="font-medium text-gray-100 mb-2">
+                命令行工具
+              </h4>
+              <div class="space-y-1 text-gray-400 font-mono">
+                <div>ai-review-mcp</div>
+                <div>ai-review-ui --mcp-request file</div>
+              </div>
+            </div>
+            <div>
+              <h4 class="font-medium text-gray-100 mb-2">
+                MCP 配置
+              </h4>
+              <div class="text-gray-400">
+                将 ai-review-mcp 添加到您的<br />
+                MCP 客户端配置中使用
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 状态指示 -->
+        <div class="mt-6 text-center">
+          <div class="inline-flex items-center px-4 py-2 bg-green-900/30 text-green-300 rounded-full text-sm">
+            <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse" />
+            MCP 服务器就绪
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+/* 确保平滑的主题切换动画 */
+#app {
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+/* 加载动画 */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
-/* Ant Design 样式覆盖 */
-.ant-btn {
-  border-radius: 6px;
-}
-
-.ant-modal {
-  border-radius: 8px;
-}
-
-/* 代码样式 */
-code {
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 </style>

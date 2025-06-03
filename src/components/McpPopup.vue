@@ -21,13 +21,14 @@
         <!-- 消息显示区域 -->
         <div v-else-if="request && request.message"
           class="mb-4">
-          <div class="bg-white dark:bg-dark-secondary rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-            <div class="leading-relaxed text-sm markdown-content text-gray-900 dark:text-gray-100">
+          <div
+            class="bg-white dark:bg-dark-secondary rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="leading-relaxed text-sm markdown-content text-gray-900 dark:text-gray-100 text-left">
               <vue-markdown-it :source="request.message"
                 :options="markdownOptions"
                 v-if="request.is_markdown" />
               <div v-else
-                class="whitespace-pre-wrap">{{ request.message }}</div>
+                class="whitespace-pre-wrap text-left">{{ request.message }}</div>
             </div>
           </div>
         </div>
@@ -51,14 +52,14 @@
               <label v-for="(option, index) in request.predefined_options"
                 :key="`option-${index}`"
                 class="checkbox flex items-center p-3 rounded-lg transition-colors group bg-white hover:bg-blue-50 dark:bg-dark-secondary dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 cursor-pointer">
-                <input 
-                  type="checkbox"
+                <input type="checkbox"
                   :value="option"
                   v-model="selectedOptions"
                   class="sr-only" />
                 <div class="checkbox-box"></div>
-                <span class="ml-3 text-sm text-gray-800 group-hover:text-blue-700 dark:text-gray-200 dark:group-hover:text-blue-300">{{
-                  option }}</span>
+                <span
+                  class="ml-3 text-sm text-gray-800 group-hover:text-blue-700 dark:text-gray-200 dark:group-hover:text-blue-300">{{
+                    option }}</span>
               </label>
             </div>
           </div>
@@ -94,14 +95,14 @@
             </p>
           </div>
 
-          <textarea 
-            ref="textareaRef"
+          <textarea ref="textareaRef"
             v-model="userInput"
             :placeholder="request.predefined_options ? '您可以在这里添加补充说明...' : '请输入您的回复...'"
             :rows="request.predefined_options ? 3 : 5"
             class="textarea"
             :disabled="submitting"
             @keydown.meta.enter="submitInput"
+            @keydown.stop
             @paste="handleImagePaste" />
         </div>
 
@@ -144,7 +145,8 @@
               <div v-if="submitting"
                 class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               <!-- 发送图标 -->
-              <span v-else class="text-xs">↗</span>
+              <span v-else
+                class="text-xs">↗</span>
               <span class="text-sm">{{ submitting ? '发送中...' : '发送' }}</span>
             </button>
           </div>
@@ -159,7 +161,7 @@ import { ref, nextTick, onMounted, computed, watch } from 'vue'
 import { message } from '../utils/message.js'
 import { VueMarkdownIt } from '@f3ve/vue-markdown-it'
 
-interface McpRequest {
+type McpRequest = {
   id: string
   message: string
   predefined_options?: string[]
@@ -173,7 +175,7 @@ const props = defineProps<{
 
 // Emits
 const emit = defineEmits<{
-  response: [response: string]
+  response: [response: any[]]
   cancel: []
 }>()
 
@@ -213,36 +215,53 @@ const submitInput = () => {
   }
 }
 
+const buildTextContent = () => {
+  const textParts: string[] = []
+  if (selectedOptions.value.length > 0) {
+    textParts.push(`选择的选项: ${selectedOptions.value.join(', ')}`)
+  }
+  if (userInput.value.trim()) {
+    textParts.push(userInput.value.trim())
+  }
+  return textParts.length > 0 ? textParts.join('\n\n') : null
+}
+
+// 构建图片内容
+const buildImageContent = () => {
+  const imageContent: any[] = []
+  for (const imageDataUrl of draggedImages.value) {
+    const matches = imageDataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/)
+    if (matches) {
+      const [, mediaType, base64Data] = matches
+      imageContent.push({
+        type: "image",
+        source: { type: "base64", media_type: mediaType, data: base64Data }
+      })
+    }
+  }
+  return imageContent
+}
+
 // 处理提交
 const handleSubmit = async () => {
   if (!canSubmit.value || submitting.value) return
 
   submitting.value = true
-
   try {
-    let response = ''
-    
-    // 组合响应内容
-    const parts: string[] = []
-    
-    if (selectedOptions.value.length > 0) {
-      parts.push(`选择的选项: ${selectedOptions.value.join(', ')}`)
+    const responseContent: any[] = []
+
+    const textContent = buildTextContent()
+    if (textContent) {
+      responseContent.push({ type: "text", text: textContent })
     }
-    
-    if (userInput.value.trim()) {
-      parts.push(userInput.value.trim())
+
+    responseContent.push(...buildImageContent())
+
+    if (responseContent.length === 0) {
+      responseContent.push({ type: "text", text: "用户确认继续" })
     }
-    
-    if (draggedImages.value.length > 0) {
-      parts.push(`[图片数量: ${draggedImages.value.length}]`)
-      // 这里可以添加图片处理逻辑
-    }
-    
-    response = parts.join('\n\n')
-    
-    if (response) {
-      emit('response', response)
-    }
+
+    emit('response', responseContent)
   } catch (error) {
     console.error('提交失败:', error)
     message.error('提交失败，请重试')
@@ -254,7 +273,11 @@ const handleSubmit = async () => {
 // 处理继续
 const handleContinue = () => {
   if (submitting.value) return
-  emit('response', '请按照最佳实践继续完成')
+  const continueResponse = [{
+    type: "text",
+    text: "请按照最佳实践继续完成"
+  }]
+  emit('response', continueResponse)
 }
 
 // 处理图片拖拽
@@ -268,16 +291,23 @@ const handleImageDrop = (event: DragEvent) => {
 
 const handleImagePaste = (event: ClipboardEvent) => {
   const items = event.clipboardData?.items
+  let hasImage = false
+
   if (items) {
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i]
-      if (item.type.indexOf('image') !== -1) {
+    for (const item of items) {
+      if (item.type.includes('image')) {
+        hasImage = true
         const file = item.getAsFile()
         if (file) {
           handleImageFiles([file])
         }
       }
     }
+  }
+
+  // 如果检测到图片，阻止默认的粘贴行为（防止文件名被粘贴到输入框）
+  if (hasImage) {
+    event.preventDefault()
   }
 }
 
@@ -308,81 +338,127 @@ const removeImage = (index: number) => {
   draggedImages.value.splice(index, 1)
 }
 
-// 设置代码复制功能
-const setupCodeCopy = () => {
-  nextTick(() => {
-    // 处理pre元素，添加复制按钮
-    const preElements = document.querySelectorAll('.markdown-content pre')
-    preElements.forEach((preEl) => {
-      // 检查是否已经添加了复制按钮
-      if (preEl.querySelector('.copy-button')) return
+// 创建复制按钮
+const createCopyButton = (preEl: Element) => {
+  if (preEl.querySelector('.copy-button')) return
 
-      // 创建复制按钮
-      const copyButton = document.createElement('button')
-      copyButton.className = 'copy-button absolute top-2 right-2 px-2 py-1 text-xs rounded transition-colors'
-      copyButton.innerHTML = '📋 复制'
+  const copyButton = document.createElement('button')
+  copyButton.className = 'copy-button absolute top-2 right-2 px-2 py-1 text-xs rounded transition-colors'
+  copyButton.innerHTML = '📋 复制'
+  copyButton.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300', 'dark:bg-gray-700', 'dark:text-gray-300', 'dark:hover:bg-gray-600')
 
-      // 设置按钮样式 
-      copyButton.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300', 'dark:bg-gray-700', 'dark:text-gray-300', 'dark:hover:bg-gray-600')
+  copyButton.addEventListener('click', async (e) => {
+    e.stopPropagation()
+    try {
+      const codeEl = preEl.querySelector('code')
+      const text = codeEl?.textContent || preEl.textContent || ''
+      await navigator.clipboard.writeText(text)
+      copyButton.innerHTML = '✅ 已复制'
+      setTimeout(() => { copyButton.innerHTML = '📋 复制' }, 2000)
+      message.success('代码已复制到剪贴板')
+    } catch (err) {
+      message.error('复制失败')
+    }
+  })
 
-      // 添加点击事件
-      copyButton.addEventListener('click', async (e) => {
-        e.stopPropagation()
-        try {
-          const codeEl = preEl.querySelector('code')
-          const text = codeEl?.textContent || preEl.textContent || ''
-          await navigator.clipboard.writeText(text)
-          copyButton.innerHTML = '✅ 已复制'
-          setTimeout(() => {
-            copyButton.innerHTML = '📋 复制'
-          }, 2000)
-          message.success('代码已复制到剪贴板')
-        } catch (err) {
-          message.error('复制失败')
-        }
-      })
+    ; (preEl as HTMLElement).style.position = 'relative'
+  preEl.appendChild(copyButton)
+}
 
-      // 设置pre元素为相对定位
-      ; (preEl as HTMLElement).style.position = 'relative'
-      preEl.appendChild(copyButton)
-    })
-
-    // 处理内联代码
-    const inlineCodeElements = document.querySelectorAll('.markdown-content p code, .markdown-content li code')
-    inlineCodeElements.forEach((codeEl) => {
-      codeEl.addEventListener('click', async () => {
-        try {
-          await navigator.clipboard.writeText(codeEl.textContent || '')
-          message.success('代码已复制到剪贴板')
-        } catch (err) {
-          message.error('复制失败')
-        }
-      })
+// 设置内联代码复制
+const setupInlineCodeCopy = () => {
+  const inlineCodeElements = document.querySelectorAll('.markdown-content p code, .markdown-content li code')
+  inlineCodeElements.forEach((codeEl) => {
+    codeEl.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(codeEl.textContent || '')
+        message.success('代码已复制到剪贴板')
+      } catch (err) {
+        message.error('复制失败')
+      }
     })
   })
 }
 
+// 设置代码复制功能
+const setupCodeCopy = () => {
+  nextTick(() => {
+    const preElements = document.querySelectorAll('.markdown-content pre')
+    preElements.forEach(createCopyButton)
+    setupInlineCodeCopy()
+  })
+}
+
+// 设置焦点的函数
+const setInputFocus = () => {
+  if (textareaRef.value) {
+    textareaRef.value.focus()
+  }
+}
+
 // 生命周期
 onMounted(() => {
-  // 等待DOM更新后设置焦点和代码复制
-  nextTick(() => {
-    if (textareaRef.value) {
-      textareaRef.value.focus()
+  // 立即设置代码复制功能
+  setupCodeCopy()
+  
+  // 延迟设置焦点，确保DOM完全渲染
+  setTimeout(() => {
+    setInputFocus()
+  }, 100)
+  
+  // 额外的焦点确保机制
+  setTimeout(() => {
+    if (document.activeElement !== textareaRef.value) {
+      setInputFocus()
     }
-    setupCodeCopy()
-  })
+  }, 300)
 })
 
-// 监听request变化，重新设置代码复制
+// 监听request变化，重新设置代码复制和焦点
 watch(() => props.request, () => {
   setupCodeCopy()
+  // 当请求数据更新时，重新设置焦点
+  nextTick(() => {
+    setTimeout(() => {
+      setInputFocus()
+    }, 50)
+  })
 }, { deep: true })
 </script>
 
 <style scoped>
 /* 组件特定样式 */
 .markdown-content {
-  /* Markdown 内容样式 */
+  text-align: left;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  text-align: left;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+
+.markdown-content p {
+  text-align: left;
+  margin-bottom: 0.75em;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  text-align: left;
+  margin-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.markdown-content li {
+  text-align: left;
+  margin-bottom: 0.25em;
 }
 
 .markdown-content pre {
@@ -413,7 +489,7 @@ watch(() => props.request, () => {
   position: relative;
 }
 
-.checkbox input:checked + .checkbox-box::after {
+.checkbox input:checked+.checkbox-box::after {
   font-size: 10px;
   line-height: 1;
 }
@@ -423,7 +499,7 @@ watch(() => props.request, () => {
   .bg-gray-50 {
     background-color: #1f1f2b !important;
   }
-  
+
   .bg-white {
     background-color: #272b3a !important;
   }
