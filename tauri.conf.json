@@ -23,7 +23,7 @@
         "decorations": true,
         "hiddenTitle": true,
         "transparent": false,
-        "skipTaskbar": false,
+        "skipTaskbar": true,
         "resizable": true,
         "fullscreen": false
       }

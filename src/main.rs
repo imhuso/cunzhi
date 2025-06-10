@@ -141,8 +141,16 @@ fn read_mcp_request(file_path: String) -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-fn exit_app() -> Result<(), String> {
-    std::process::exit(0);
+async fn exit_app(app: AppHandle) -> Result<(), String> {
+    // 关闭所有窗口
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.close();
+    }
+
+    // 强制退出应用
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    app.exit(0);
+    Ok(())
 }
 
 fn get_config_path(app: &AppHandle) -> Result<PathBuf> {
@@ -385,6 +393,14 @@ async fn handle_mcp_popup_mode(app_handle: AppHandle, request_file: &str) -> Res
         match try_create_popup_connection(&app_handle, &request, attempt).await {
             Ok(response) => {
                 println!("{}", response.trim());
+
+                // 关闭所有窗口
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.close();
+                }
+
+                // 强制退出应用
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 app_handle.exit(0);
                 return Ok(());
             }

@@ -21,12 +21,18 @@
         <!-- 消息显示区域 -->
         <div v-else-if="request?.message"
           class="mb-4">
+          <!-- 调试信息 -->
+          <div v-if="false" class="mb-2 p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded text-xs">
+            <strong>调试信息:</strong> is_markdown = {{ request.is_markdown }},
+            message length = {{ request.message?.length }}
+          </div>
+
           <div
             class="bg-white dark:bg-dark-secondary rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
             <div class="leading-relaxed text-sm markdown-content text-gray-900 dark:text-gray-100 text-left">
-              <vue-markdown-it v-if="request.is_markdown"
-                :source="request.message"
-                :options="markdownOptions" />
+              <div v-if="request.is_markdown"
+                v-html="renderMarkdown(request.message)"
+                class="markdown-rendered"></div>
               <div v-else
                 class="whitespace-pre-wrap text-left">{{ request.message }}</div>
             </div>
@@ -159,7 +165,9 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, computed, watch } from 'vue'
 import { message } from '../utils/message.js'
-import { VueMarkdownIt } from '@f3ve/vue-markdown-it'
+import MarkdownIt from 'markdown-it'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github-dark.css'
 
 type McpRequest = {
   id: string
@@ -202,15 +210,36 @@ const canSubmit = computed(() => {
 // 静态值，避免重复计算
 const connectionStatus = '已连接'
 
-// Markdown 配置
-const markdownOptions = {
-  html: false,
+// 创建 Markdown 实例
+const md = new MarkdownIt({
+  html: true, // 允许HTML标签
   xhtmlOut: false,
-  breaks: true,
+  breaks: true, // 换行符转换为<br>
   langPrefix: 'language-',
-  linkify: true,
-  typographer: true,
+  linkify: true, // 自动转换链接
+  typographer: true, // 启用智能引号等
   quotes: '""\'\'',
+  // 启用代码高亮
+  highlight: function (str: string, lang: string) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return hljs.highlight(str, { language: lang }).value
+      } catch (__) {
+        // 忽略错误
+      }
+    }
+    return '' // 使用默认的转义
+  }
+})
+
+// Markdown 渲染函数
+const renderMarkdown = (content: string) => {
+  try {
+    return md.render(content)
+  } catch (error) {
+    console.error('Markdown 渲染失败:', error)
+    return content // 如果渲染失败，返回原始内容
+  }
 }
 
 // 提交输入
@@ -500,8 +529,11 @@ watch(() => props.request, () => {
 /* 组件特定样式 */
 .markdown-content {
   text-align: left;
+  line-height: 1.6;
+  color: inherit;
 }
 
+/* 标题样式 */
 .markdown-content h1,
 .markdown-content h2,
 .markdown-content h3,
@@ -509,50 +541,171 @@ watch(() => props.request, () => {
 .markdown-content h5,
 .markdown-content h6 {
   text-align: left;
-  margin-top: 1em;
-  margin-bottom: 0.5em;
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
   font-weight: 600;
+  color: inherit;
 }
 
+.markdown-content h1 { font-size: 1.5em; }
+.markdown-content h2 { font-size: 1.3em; }
+.markdown-content h3 { font-size: 1.2em; }
+.markdown-content h4 { font-size: 1.1em; }
+.markdown-content h5 { font-size: 1em; }
+.markdown-content h6 { font-size: 0.9em; }
+
+/* 段落样式 */
 .markdown-content p {
   text-align: left;
-  margin-bottom: 0.75em;
+  margin-bottom: 1em;
+  color: inherit;
 }
 
+/* 列表样式 */
 .markdown-content ul,
 .markdown-content ol {
   text-align: left;
   margin-left: 1.5em;
-  margin-bottom: 0.75em;
+  margin-bottom: 1em;
+  padding-left: 0;
 }
 
 .markdown-content li {
   text-align: left;
-  margin-bottom: 0.25em;
+  margin-bottom: 0.5em;
+  color: inherit;
 }
 
+/* 引用样式 */
+.markdown-content blockquote {
+  border-left: 4px solid #e5e7eb;
+  margin: 1em 0;
+  padding-left: 1em;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.dark .markdown-content blockquote {
+  border-left-color: #4b5563;
+  color: #9ca3af;
+}
+
+/* 代码块样式 */
 .markdown-content pre {
   background-color: #f6f8fa;
   border-radius: 6px;
-  padding: 12px;
+  padding: 16px;
   overflow-x: auto;
   position: relative;
+  margin: 1em 0;
+  border: 1px solid #e1e4e8;
 }
 
 .dark .markdown-content pre {
-  background-color: #2d2d2d;
+  background-color: #161b22 !important;
+  border-color: #30363d;
+  color: #e6edf3 !important;
 }
 
+/* 确保代码块内的所有文本都可见 */
+.dark .markdown-content pre code,
+.dark .markdown-content pre .hljs {
+  background-color: transparent !important;
+  color: #e6edf3 !important;
+}
+
+/* 覆盖 highlight.js 的暗色主题样式 */
+.dark .markdown-content .hljs {
+  background: #161b22 !important;
+  color: #e6edf3 !important;
+}
+
+.dark .markdown-content .hljs-keyword,
+.dark .markdown-content .hljs-selector-tag,
+.dark .markdown-content .hljs-literal,
+.dark .markdown-content .hljs-section,
+.dark .markdown-content .hljs-link {
+  color: #ff7b72 !important;
+}
+
+.dark .markdown-content .hljs-string {
+  color: #a5d6ff !important;
+}
+
+.dark .markdown-content .hljs-comment {
+  color: #8b949e !important;
+}
+
+.dark .markdown-content .hljs-number {
+  color: #79c0ff !important;
+}
+
+.dark .markdown-content .hljs-function,
+.dark .markdown-content .hljs-title {
+  color: #d2a8ff !important;
+}
+
+/* 行内代码样式 */
 .markdown-content code {
   background-color: rgba(175, 184, 193, 0.2);
-  padding: 2px 4px;
-  border-radius: 3px;
-  font-size: 0.85em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   cursor: pointer;
+  color: #d73a49;
 }
 
 .dark .markdown-content code {
-  background-color: rgba(125, 125, 125, 0.3);
+  background-color: rgba(110, 118, 129, 0.4);
+  color: #f85149;
+}
+
+/* 代码块内的代码不需要背景 */
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* 链接样式 */
+.markdown-content a {
+  color: #3b82f6;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.markdown-content a:hover {
+  color: #1d4ed8;
+}
+
+.dark .markdown-content a {
+  color: #60a5fa;
+}
+
+.dark .markdown-content a:hover {
+  color: #93c5fd;
+}
+
+/* 强调样式 */
+.markdown-content strong {
+  font-weight: 600;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+/* 分隔线样式 */
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 2em 0;
+}
+
+.dark .markdown-content hr {
+  border-top-color: #4b5563;
 }
 
 .checkbox-box {
