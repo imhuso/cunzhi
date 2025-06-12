@@ -10,6 +10,7 @@ use std::os::unix::fs as unix_fs;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct AppConfig {
     init_prompt: String,
+    always_on_top: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +26,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             init_prompt: "# 交互式任务规则\n\n- 需要了解参数时使用 `ai-review-cli help` 命令\n- 遇到问题或不确定时必须通过 `ai-review-cli [message] --timeout` 询问，等待回复\n- 如果超时没有任何输出，默认为我对你做了正面的响应\n- 聊天结束时必须运行 `ai-review-cli 你觉得我当前的任务是否已经完成`，不要自主/自以为完成了任务或结束对话，必须得到用户认可\n- 然后在恢复对话之前检索输入值。".to_string(),
+            always_on_top: true, // 默认启用置顶
         }
     }
 }
@@ -82,6 +84,46 @@ async fn reset_init_prompt(state: State<'_, AppState>, app: tauri::AppHandle) ->
     // 保存配置到文件
     save_config(&state, &app).await.map_err(|e| format!("保存配置失败: {}", e))?;
     Ok(default_prompt)
+}
+
+#[tauri::command]
+async fn get_always_on_top(state: State<'_, AppState>) -> Result<bool, String> {
+    let config = state.config.lock().map_err(|e| format!("获取配置失败: {}", e))?;
+    Ok(config.always_on_top)
+}
+
+#[tauri::command]
+async fn set_always_on_top(enabled: bool, state: State<'_, AppState>, app: tauri::AppHandle) -> Result<(), String> {
+    {
+        let mut config = state.config.lock().map_err(|e| format!("获取配置失败: {}", e))?;
+        config.always_on_top = enabled;
+    }
+
+    // 保存配置到文件
+    save_config(&state, &app).await.map_err(|e| format!("保存配置失败: {}", e))?;
+
+    // 应用到当前窗口
+    if let Some(window) = app.get_webview_window("main") {
+        window.set_always_on_top(enabled).map_err(|e| format!("设置窗口置顶失败: {}", e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn sync_window_state(state: State<'_, AppState>, app: tauri::AppHandle) -> Result<(), String> {
+    // 根据配置同步窗口状态
+    let always_on_top = {
+        let config = state.config.lock().map_err(|e| format!("获取配置失败: {}", e))?;
+        config.always_on_top
+    };
+
+    // 应用到当前窗口
+    if let Some(window) = app.get_webview_window("main") {
+        window.set_always_on_top(always_on_top).map_err(|e| format!("同步窗口状态失败: {}", e))?;
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -190,6 +232,25 @@ async fn load_config(state: &State<'_, AppState>, app: &AppHandle) -> Result<()>
         let mut config_guard = state.config.lock()
             .map_err(|e| anyhow::anyhow!("获取配置锁失败: {}", e))?;
         *config_guard = config;
+    }
+
+    Ok(())
+}
+
+async fn load_config_and_apply_window_settings(state: &State<'_, AppState>, app: &AppHandle) -> Result<()> {
+    // 先加载配置
+    load_config(state, app).await?;
+
+    // 然后应用窗口设置
+    let always_on_top = {
+        let config = state.config.lock()
+            .map_err(|e| anyhow::anyhow!("获取配置失败: {}", e))?;
+        config.always_on_top
+    };
+
+    // 应用到窗口
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_always_on_top(always_on_top);
     }
 
     Ok(())
@@ -326,6 +387,9 @@ async fn main() -> Result<()> {
             get_init_prompt,
             set_init_prompt,
             reset_init_prompt,
+            get_always_on_top,
+            set_always_on_top,
+            sync_window_state,
             send_mcp_response,
             get_cli_args,
             read_mcp_request,
@@ -344,22 +408,30 @@ async fn main() -> Result<()> {
             // 检查命令行参数
             let args: Vec<String> = std::env::args().collect();
             if args.len() >= 3 && args[1] == "--mcp-request" {
-                // MCP弹窗模式
+                // MCP弹窗模式 - 先加载配置，再处理弹窗
                 let request_file = args[2].clone();
                 let app_handle_mcp = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
+                    // 先加载配置
+                    if let Some(state) = app_handle_mcp.try_state::<AppState>() {
+                        if let Err(e) = load_config(&state, &app_handle_mcp).await {
+                            eprintln!("MCP模式加载配置失败: {}", e);
+                        }
+                    }
+
+                    // 然后处理MCP弹窗
                     if let Err(e) = handle_mcp_popup_mode(app_handle_mcp, &request_file).await {
                         eprintln!("MCP弹窗模式处理失败: {}", e);
                         std::process::exit(1);
                     }
                 });
             } else {
-                // 正常模式 - 只加载配置，不启动文件监听
+                // 正常模式 - 加载配置并应用窗口设置
                 let app_handle_normal = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
                     if let Some(state) = app_handle_normal.try_state::<AppState>() {
-                        if let Err(e) = load_config(&state, &app_handle_normal).await {
-                            eprintln!("加载配置失败: {}", e);
+                        if let Err(e) = load_config_and_apply_window_settings(&state, &app_handle_normal).await {
+                            eprintln!("加载配置和应用窗口设置失败: {}", e);
                         }
                     }
                 });
@@ -430,9 +502,18 @@ async fn try_create_popup_connection(app_handle: &AppHandle, request: &McpPopupR
 
     // 获取主窗口并发送MCP请求事件
     if let Some(window) = app_handle.get_webview_window("main") {
-        // 立即显示窗口和设置属性
+        // 立即显示窗口
         let _ = window.show();
-        let _ = window.set_always_on_top(true);
+
+        // 根据配置设置置顶状态，而不是强制设置为true
+        if let Some(state) = app_handle.try_state::<AppState>() {
+            let always_on_top = {
+                let config = state.config.lock()
+                    .map_err(|e| anyhow::anyhow!("获取配置失败: {}", e))?;
+                config.always_on_top
+            };
+            let _ = window.set_always_on_top(always_on_top);
+        }
         
         // 先发送事件，后设置焦点
         window.emit("mcp-request", &request)

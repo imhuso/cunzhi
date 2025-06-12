@@ -1,6 +1,7 @@
 <script setup>
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { onMounted, ref } from 'vue'
 import McpPopup from './components/McpPopup.vue'
 
@@ -8,6 +9,7 @@ import McpPopup from './components/McpPopup.vue'
 const mcpRequest = ref(null)
 const showMcpPopup = ref(false)
 const isDarkMode = ref(false)
+const alwaysOnTop = ref(true)
 
 // 强制应用暗黑主题
 function setupDarkMode() {
@@ -38,6 +40,34 @@ async function handleMcpCancel() {
   }
   catch (error) {
     console.error('处理MCP取消失败:', error)
+  }
+}
+
+// 加载窗口设置
+async function loadWindowSettings() {
+  try {
+    const enabled = await invoke('get_always_on_top')
+    alwaysOnTop.value = enabled
+
+    // 同步窗口状态
+    await invoke('sync_window_state')
+    console.log('窗口设置已加载并同步:', enabled)
+  }
+  catch (error) {
+    console.error('加载窗口设置失败:', error)
+  }
+}
+
+// 切换置顶设置
+async function toggleAlwaysOnTop() {
+  try {
+    const newValue = !alwaysOnTop.value
+    await invoke('set_always_on_top', { enabled: newValue })
+    alwaysOnTop.value = newValue
+    console.log('窗口置顶设置已更新:', newValue)
+  }
+  catch (error) {
+    console.error('切换置顶设置失败:', error)
   }
 }
 
@@ -88,6 +118,9 @@ onMounted(async () => {
   // 检查是否为MCP模式
   const isMcp = await checkMcpMode()
 
+  // 无论是否为MCP模式，都加载窗口设置
+  await loadWindowSettings()
+
   // 如果不是MCP模式，设置事件监听器
   if (!isMcp) {
     await setupMcpEventListener()
@@ -113,7 +146,7 @@ onMounted(async () => {
       v-else
       class="flex items-center justify-center min-h-screen p-6"
     >
-      <div class="max-w-2xl w-full">
+      <div class="max-w-6xl w-full">
         <!-- 主标题 -->
         <div class="text-center mb-8">
           <div
@@ -130,7 +163,7 @@ onMounted(async () => {
         </div>
 
         <!-- 功能卡片 -->
-        <div class="grid gap-6 md:grid-cols-2">
+        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <!-- MCP服务器功能 -->
           <div class="bg-dark-secondary rounded-xl p-6 shadow-lg border border-gray-700">
             <div class="flex items-center mb-4">
@@ -199,6 +232,49 @@ onMounted(async () => {
                 最佳实践收集
               </li>
             </ul>
+          </div>
+
+          <!-- 窗口设置功能 -->
+          <div class="bg-dark-secondary rounded-xl p-6 shadow-lg border border-gray-700">
+            <div class="flex items-center mb-4">
+              <div class="w-12 h-12 bg-green-900 rounded-lg flex items-center justify-center mr-4">
+                <span class="text-2xl">⚙️</span>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-100">
+                  窗口设置
+                </h3>
+                <p class="text-sm text-gray-400">
+                  显示偏好配置
+                </p>
+              </div>
+            </div>
+            <div class="space-y-4">
+              <!-- 置顶显示切换开关 -->
+              <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                  <span class="w-2 h-2 bg-blue-500 rounded-full mr-2" />
+                  <span class="text-sm text-gray-300">总在最前</span>
+                </div>
+                <button
+                  @click="toggleAlwaysOnTop"
+                  :class="[
+                    'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800',
+                    alwaysOnTop ? 'bg-blue-600' : 'bg-gray-600'
+                  ]"
+                >
+                  <span
+                    :class="[
+                      'inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out',
+                      alwaysOnTop ? 'translate-x-6' : 'translate-x-1'
+                    ]"
+                  />
+                </button>
+              </div>
+              <p class="text-xs text-gray-500">
+                启用后窗口将始终保持在其他应用程序之上
+              </p>
+            </div>
           </div>
         </div>
 
