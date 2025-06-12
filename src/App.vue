@@ -10,6 +10,7 @@ const mcpRequest = ref(null)
 const showMcpPopup = ref(false)
 const isDarkMode = ref(false)
 const alwaysOnTop = ref(true)
+const audioNotificationEnabled = ref(true)
 
 // 强制应用暗黑主题
 function setupDarkMode() {
@@ -49,9 +50,13 @@ async function loadWindowSettings() {
     const enabled = await invoke('get_always_on_top')
     alwaysOnTop.value = enabled
 
+    // 加载音频通知设置
+    const audioEnabled = await invoke('get_audio_notification_enabled')
+    audioNotificationEnabled.value = audioEnabled
+
     // 同步窗口状态
     await invoke('sync_window_state')
-    console.log('窗口设置已加载并同步:', enabled)
+    console.log('窗口设置已加载并同步:', enabled, '音频通知:', audioEnabled)
   }
   catch (error) {
     console.error('加载窗口设置失败:', error)
@@ -71,10 +76,31 @@ async function toggleAlwaysOnTop() {
   }
 }
 
+// 切换音频通知设置
+async function toggleAudioNotification() {
+  try {
+    const newValue = !audioNotificationEnabled.value
+    await invoke('set_audio_notification_enabled', { enabled: newValue })
+    audioNotificationEnabled.value = newValue
+    console.log('音频通知设置已更新:', newValue)
+  }
+  catch (error) {
+    console.error('切换音频通知设置失败:', error)
+  }
+}
+
 // 显示MCP弹窗
-function showMcpDialog(request) {
+async function showMcpDialog(request) {
   mcpRequest.value = request
   showMcpPopup.value = true
+
+  // 播放音频通知
+  try {
+    await invoke('play_notification_sound')
+  }
+  catch (error) {
+    console.error('播放音频通知失败:', error)
+  }
 }
 
 // 检查MCP模式
@@ -273,6 +299,31 @@ onMounted(async () => {
               </div>
               <p class="text-xs text-gray-500">
                 启用后窗口将始终保持在其他应用程序之上
+              </p>
+
+              <!-- 音频通知切换开关 -->
+              <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                  <span class="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                  <span class="text-sm text-gray-300">音频通知</span>
+                </div>
+                <button
+                  @click="toggleAudioNotification"
+                  :class="[
+                    'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800',
+                    audioNotificationEnabled ? 'bg-green-600' : 'bg-gray-600'
+                  ]"
+                >
+                  <span
+                    :class="[
+                      'inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out',
+                      audioNotificationEnabled ? 'translate-x-6' : 'translate-x-1'
+                    ]"
+                  />
+                </button>
+              </div>
+              <p class="text-xs text-gray-500">
+                启用后在MCP工具被触发时播放音频提示，首次启用时会自动从应用资源中复制音频文件
               </p>
             </div>
           </div>

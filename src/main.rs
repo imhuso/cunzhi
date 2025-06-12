@@ -6,11 +6,19 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State, Emitter};
 use std::time::Duration;
 use std::os::unix::fs as unix_fs;
+use std::io::BufReader;
+use rodio::{Decoder, OutputStream, Sink};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct AppConfig {
     init_prompt: String,
     always_on_top: bool,
+    #[serde(default = "default_audio_notification_enabled")]
+    audio_notification_enabled: bool,
+}
+
+fn default_audio_notification_enabled() -> bool {
+    false // 默认关闭音频通知
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,6 +35,7 @@ impl Default for AppConfig {
         Self {
             init_prompt: "# 交互式任务规则\n\n- 需要了解参数时使用 `ai-review-cli help` 命令\n- 遇到问题或不确定时必须通过 `ai-review-cli [message] --timeout` 询问，等待回复\n- 如果超时没有任何输出，默认为我对你做了正面的响应\n- 聊天结束时必须运行 `ai-review-cli 你觉得我当前的任务是否已经完成`，不要自主/自以为完成了任务或结束对话，必须得到用户认可\n- 然后在恢复对话之前检索输入值。".to_string(),
             always_on_top: true, // 默认启用置顶
+            audio_notification_enabled: false, // 默认关闭音频通知
         }
     }
 }
@@ -122,6 +131,53 @@ async fn sync_window_state(state: State<'_, AppState>, app: tauri::AppHandle) ->
     if let Some(window) = app.get_webview_window("main") {
         window.set_always_on_top(always_on_top).map_err(|e| format!("同步窗口状态失败: {}", e))?;
     }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_audio_notification_enabled(state: State<'_, AppState>) -> Result<bool, String> {
+    let config = state.config.lock().map_err(|e| format!("获取配置失败: {}", e))?;
+    Ok(config.audio_notification_enabled)
+}
+
+#[tauri::command]
+async fn set_audio_notification_enabled(enabled: bool, state: State<'_, AppState>, app: tauri::AppHandle) -> Result<(), String> {
+    // 如果是首次启用音频通知，先复制音频文件
+    if enabled {
+        if let Err(e) = ensure_audio_file_exists(&app).await {
+            return Err(format!("准备音频文件失败: {}", e));
+        }
+    }
+
+    {
+        let mut config = state.config.lock().map_err(|e| format!("获取配置失败: {}", e))?;
+        config.audio_notification_enabled = enabled;
+    }
+
+    // 保存配置到文件
+    save_config(&state, &app).await.map_err(|e| format!("保存配置失败: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn play_notification_sound(state: State<'_, AppState>, app: tauri::AppHandle) -> Result<(), String> {
+    // 检查是否启用音频通知
+    let enabled = {
+        let config = state.config.lock().map_err(|e| format!("获取配置失败: {}", e))?;
+        config.audio_notification_enabled
+    };
+
+    if !enabled {
+        return Ok(());
+    }
+
+    // 异步播放音频，避免阻塞主线程
+    tokio::spawn(async move {
+        if let Err(e) = play_audio_file(&app).await {
+            eprintln!("播放音频失败: {}", e);
+        }
+    });
 
     Ok(())
 }
@@ -254,6 +310,99 @@ async fn load_config_and_apply_window_settings(state: &State<'_, AppState>, app:
     }
 
     Ok(())
+}
+
+async fn play_audio_file(app: &AppHandle) -> Result<()> {
+    // 获取音频文件路径
+    let audio_path = get_audio_file_path(app)?;
+
+    if !audio_path.exists() {
+        return Err(anyhow::anyhow!("音频文件不存在: {:?}", audio_path));
+    }
+
+    // 在新线程中播放音频，避免阻塞
+    let audio_path_clone = audio_path.clone();
+    std::thread::spawn(move || {
+        if let Err(e) = play_audio_sync(&audio_path_clone) {
+            eprintln!("音频播放失败: {}", e);
+        }
+    });
+
+    Ok(())
+}
+
+fn play_audio_sync(audio_path: &PathBuf) -> Result<()> {
+    // 创建音频输出流
+    let (_stream, stream_handle) = OutputStream::try_default()
+        .map_err(|e| anyhow::anyhow!("创建音频输出流失败: {}", e))?;
+
+    // 创建音频播放器
+    let sink = Sink::try_new(&stream_handle)
+        .map_err(|e| anyhow::anyhow!("创建音频播放器失败: {}", e))?;
+
+    // 读取音频文件
+    let file = std::fs::File::open(audio_path)
+        .map_err(|e| anyhow::anyhow!("打开音频文件失败: {}", e))?;
+    let buf_reader = BufReader::new(file);
+
+    // 解码音频
+    let source = Decoder::new(buf_reader)
+        .map_err(|e| anyhow::anyhow!("解码音频文件失败: {}", e))?;
+
+    // 播放音频
+    sink.append(source);
+    sink.sleep_until_end();
+
+    Ok(())
+}
+
+fn get_audio_file_path(app: &AppHandle) -> Result<PathBuf> {
+    // 获取应用配置目录中的音频文件路径
+    let config_dir = app.path().app_config_dir()
+        .map_err(|e| anyhow::anyhow!("无法获取应用配置目录: {}", e))?;
+
+    let sounds_dir = config_dir.join("sounds");
+    let audio_path = sounds_dir.join("notification.mp3");
+
+    if audio_path.exists() {
+        Ok(audio_path)
+    } else {
+        Err(anyhow::anyhow!("音频文件不存在，请先在设置中启用音频通知"))
+    }
+}
+
+/// 确保音频文件存在，如果不存在则从Tauri资源目录复制
+async fn ensure_audio_file_exists(app: &AppHandle) -> Result<()> {
+    let config_dir = app.path().app_config_dir()
+        .map_err(|e| anyhow::anyhow!("无法获取应用配置目录: {}", e))?;
+
+    let sounds_dir = config_dir.join("sounds");
+    let target_audio_path = sounds_dir.join("notification.mp3");
+
+    // 如果音频文件已存在，直接返回
+    if target_audio_path.exists() {
+        return Ok(());
+    }
+
+    // 创建sounds目录
+    fs::create_dir_all(&sounds_dir)
+        .map_err(|e| anyhow::anyhow!("创建sounds目录失败: {}", e))?;
+
+    // 从Tauri资源目录复制音频文件
+    let resource_dir = app.path().resource_dir()
+        .map_err(|e| anyhow::anyhow!("无法获取Tauri资源目录: {}", e))?;
+
+    let source_audio_path = resource_dir.join("sounds/notification.mp3");
+
+    if source_audio_path.exists() {
+        fs::copy(&source_audio_path, &target_audio_path)
+            .map_err(|e| anyhow::anyhow!("复制音频文件失败: {}", e))?;
+
+        println!("✅ 音频文件已复制到: {:?}", target_audio_path);
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("无法找到音频源文件: {:?}", source_audio_path))
+    }
 }
 
 /// 创建命令行工具的软链接
@@ -390,6 +539,9 @@ async fn main() -> Result<()> {
             get_always_on_top,
             set_always_on_top,
             sync_window_state,
+            get_audio_notification_enabled,
+            set_audio_notification_enabled,
+            play_notification_sound,
             send_mcp_response,
             get_cli_args,
             read_mcp_request,

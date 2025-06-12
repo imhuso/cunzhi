@@ -34,7 +34,9 @@
         {
           "identifier": "main-capability",
           "description": "Main window capabilities",
-          "windows": ["main"],
+          "windows": [
+            "main"
+          ],
           "permissions": [
             "core:event:allow-listen",
             "core:event:allow-emit",
@@ -51,12 +53,16 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app"],
-    "icon": ["icons/icon.icns"],
-    "resources": [
-      "scripts/postinstall.sh"
+    "targets": [
+      "app"
     ],
-
+    "icon": [
+      "icons/icon.icns"
+    ],
+    "resources": [
+      "scripts/postinstall.sh",
+      "sounds/*"
+    ],
     "copyright": "",
     "category": "DeveloperTool",
     "shortDescription": "AI Review Tool",
