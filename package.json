@@ -14,7 +14,6 @@
     "tauri:icon": "tauri icon"
   },
   "dependencies": {
-    "@f3ve/vue-markdown-it": "^0.2.3",
     "@tauri-apps/api": "^2.5.0",
     "@types/markdown-it": "^14.1.2",
     "@vueuse/core": "^13.2.0",

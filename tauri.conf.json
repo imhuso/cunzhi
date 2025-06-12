@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.imhuso.ai-review",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
     "frontendDist": "./dist",
     "devUrl": "http://localhost:5176"
   },
@@ -52,7 +52,7 @@
   "bundle": {
     "active": true,
     "targets": ["app"],
-    "icon": [],
+    "icon": ["icons/icon.png"],
     "resources": [
       "scripts/postinstall.sh"
     ],

@@ -29,7 +29,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['vue', '@vueuse/core'],
-          markdown: ['@f3ve/vue-markdown-it', 'markdown-it'],
+          markdown: ['markdown-it', 'highlight.js'],
         },
       },
     },
