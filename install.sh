@@ -20,7 +20,88 @@ if [[ "$OSTYPE" != "darwin"* ]]; then
 fi
 
 echo "🔨 构建 Tauri 应用包..."
-cargo tauri build
+
+# 首先确保前端已构建
+echo "📦 构建前端资源..."
+pnpm build
+
+# 构建 Tauri 应用包，如果失败则重试
+MAX_RETRIES=3
+RETRY_COUNT=0
+
+while [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; do
+    echo "🔄 尝试构建 Tauri 应用包 (第 $((RETRY_COUNT + 1)) 次)..."
+
+    if cargo tauri build; then
+        echo "✅ Tauri 构建成功"
+        break
+    else
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; then
+            echo "⚠️  构建失败，等待 5 秒后重试..."
+            sleep 5
+        else
+            echo "❌ Tauri 构建失败，已达到最大重试次数"
+
+            # 检查是否有部分构建产物
+            if [[ -f "target/release/ai-review-ui" ]] && [[ -f "target/release/ai-review-mcp" ]]; then
+                echo "🔧 检测到二进制文件，尝试手动创建 App Bundle..."
+
+                # 手动创建 App Bundle
+                APP_BUNDLE="target/release/bundle/macos/AI Review.app"
+                mkdir -p "$APP_BUNDLE/Contents/MacOS"
+                mkdir -p "$APP_BUNDLE/Contents/Resources"
+
+                # 复制二进制文件
+                cp "target/release/ai-review-ui" "$APP_BUNDLE/Contents/MacOS/"
+                cp "target/release/ai-review-mcp" "$APP_BUNDLE/Contents/MacOS/"
+
+                # 复制图标（如果存在）
+                if [[ -f "icons/icon.icns" ]]; then
+                    cp "icons/icon.icns" "$APP_BUNDLE/Contents/Resources/"
+                fi
+
+                # 创建 Info.plist
+                cat > "$APP_BUNDLE/Contents/Info.plist" << 'PLIST_EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>AI Review</string>
+    <key>CFBundleExecutable</key>
+    <string>ai-review-ui</string>
+    <key>CFBundleIconFile</key>
+    <string>icon.icns</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.imhuso.ai-review</string>
+    <key>CFBundleName</key>
+    <string>AI Review</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>0.1.0</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.13</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+</dict>
+</plist>
+PLIST_EOF
+
+                echo "✅ 手动创建 App Bundle 成功"
+                break
+            else
+                echo "❌ 无法找到构建产物，请检查构建错误"
+                exit 1
+            fi
+        fi
+    fi
+done
 
 # 检查构建结果
 APP_BUNDLE="target/release/bundle/macos/AI Review.app"

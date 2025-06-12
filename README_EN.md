@@ -1,8 +1,8 @@
-# AI Review
+# 寸止 (Cun Zhi)
 
 English | [简体中文](./README.md)
 
-AI Review is an intelligent code review tool based on MCP (Model Context Protocol), providing popup interaction and memory management features.
+寸止 (Cun Zhi) is an intelligent code review tool based on MCP (Model Context Protocol), providing popup interaction and memory management features.
 
 ## ✨ Features
 
@@ -19,9 +19,9 @@ AI Review is an intelligent code review tool based on MCP (Model Context Protoco
 
 ### Smart Popup Interface
 
-![AI Review Popup Demo](./screenshots/demo.png)
+![寸止 Popup Demo](./screenshots/demo.png)
 
-*AI Review's modern popup interface with Markdown rendering, code highlighting, predefined options, and free text input*
+*寸止's modern popup interface with Markdown rendering, code highlighting, predefined options, and free text input*
 
 ## 🚀 Quick Start
 

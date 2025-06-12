@@ -53,3 +53,18 @@ test_client.py
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Memory files (user-specific)
+~/.ai-review/
+
+# Archive files
+*.zip
+*.dmg
+*.tar.gz
+
+# Tauri specific
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# macOS specific
+*.app/

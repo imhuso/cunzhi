@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "AI Review",
+        "title": "寸止",
         "width": 600,
         "height": 650,
         "minWidth": 500,
@@ -52,7 +52,7 @@
   "bundle": {
     "active": true,
     "targets": ["app"],
-    "icon": ["icons/icon.png"],
+    "icon": ["icons/icon.icns"],
     "resources": [
       "scripts/postinstall.sh"
     ],

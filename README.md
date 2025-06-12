@@ -1,8 +1,8 @@
-# AI Review
+# 寸止
 
 [English](./README_EN.md) | 简体中文
 
-AI Review 是一个基于 MCP (Model Context Protocol) 的智能代码审查工具，提供弹窗交互和记忆管理功能。
+寸止 是一个基于 MCP (Model Context Protocol) 的智能代码审查工具，提供弹窗交互和记忆管理功能。
 
 ## ✨ 特性
 
@@ -19,9 +19,9 @@ AI Review 是一个基于 MCP (Model Context Protocol) 的智能代码审查工�
 
 ### 智能弹窗界面
 
-![AI Review 弹窗演示](./screenshots/demo.png)
+![寸止 弹窗演示](./screenshots/demo.png)
 
-*AI Review 的现代化弹窗界面，支持 Markdown 渲染、代码高亮、预定义选项和自由文本输入*
+*寸止 的现代化弹窗界面，支持 Markdown 渲染、代码高亮、预定义选项和自由文本输入*
 
 ## 🚀 快速开始
 
@@ -80,7 +80,7 @@ cargo build --release
 ```
 AI IDE/Claude Desktop
         ↓ (MCP 调用)
-AI Review MCP 服务器
+寸止 MCP 服务器
         ↓ (启动弹窗)
 Tauri 应用 (Vue + Tailwind CSS)
         ↓ (用户交互)

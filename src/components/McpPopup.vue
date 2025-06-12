@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed inset-0 flex flex-col z-50 dark bg-dark-primary popup-container">
+  <div class="fixed inset-0 flex flex-col z-50 dark bg-dark-primary popup-container force-dark">
     <div class="relative w-full h-full flex flex-col bg-white dark:bg-dark-primary shadow-xl popup-content">
 
       <!-- 内容区域 -->
@@ -717,14 +717,55 @@ watch(() => props.request, () => {
   line-height: 1;
 }
 
-/* 深色模式适配 */
-@media (prefers-color-scheme: dark) {
-  .bg-gray-50 {
-    background-color: #1f1f2b !important;
-  }
+/* 强制暗黑模式 */
+.force-dark,
+.force-dark * {
+  color-scheme: dark;
+}
 
-  .bg-white {
-    background-color: #272b3a !important;
-  }
+/* 深色模式适配 - 移除媒体查询，直接应用 */
+.force-dark .bg-gray-50 {
+  background-color: #1f1f2b !important;
+}
+
+.force-dark .bg-white {
+  background-color: #272b3a !important;
+}
+
+/* 强制暗黑模式下的所有元素 */
+.force-dark .text-gray-900 {
+  color: #f3f4f6 !important;
+}
+
+.force-dark .text-gray-800 {
+  color: #e5e7eb !important;
+}
+
+.force-dark .text-gray-600 {
+  color: #9ca3af !important;
+}
+
+.force-dark .text-gray-500 {
+  color: #6b7280 !important;
+}
+
+.force-dark .border-gray-200 {
+  border-color: #374151 !important;
+}
+
+.force-dark .border-gray-300 {
+  border-color: #4b5563 !important;
+}
+
+.force-dark .bg-gray-100 {
+  background-color: #374151 !important;
+}
+
+.force-dark .border-gray-600 {
+  border-color: #6b7280 !important;
+}
+
+.force-dark .bg-gray-800\/50 {
+  background-color: rgba(31, 41, 55, 0.8) !important;
 }
 </style>
