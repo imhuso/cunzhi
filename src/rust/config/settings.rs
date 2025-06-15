@@ -94,6 +94,8 @@ pub struct TelegramConfig {
     pub bot_token: String, // Bot Token
     #[serde(default = "default_telegram_chat_id")]
     pub chat_id: String, // Chat ID
+    #[serde(default = "default_telegram_hide_frontend_popup")]
+    pub hide_frontend_popup: bool, // 是否隐藏前端弹窗，仅使用Telegram交互
 }
 
 #[derive(Debug)]
@@ -150,6 +152,7 @@ pub fn default_telegram_config() -> TelegramConfig {
         enabled: default_telegram_enabled(),
         bot_token: default_telegram_bot_token(),
         chat_id: default_telegram_chat_id(),
+        hide_frontend_popup: default_telegram_hide_frontend_popup(),
     }
 }
 
@@ -269,6 +272,10 @@ pub fn default_telegram_bot_token() -> String {
 
 pub fn default_telegram_chat_id() -> String {
     "".to_string() // 默认为空
+}
+
+pub fn default_telegram_hide_frontend_popup() -> bool {
+    false // 默认不隐藏前端弹窗，保持现有行为
 }
 
 impl WindowConfig {

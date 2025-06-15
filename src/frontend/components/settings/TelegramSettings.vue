@@ -7,6 +7,7 @@ interface TelegramConfig {
   enabled: boolean
   bot_token: string
   chat_id: string
+  hide_frontend_popup: boolean
 }
 
 const emit = defineEmits(['telegramConfigChange'])
@@ -19,6 +20,7 @@ const telegramConfig = ref<TelegramConfig>({
   enabled: false,
   bot_token: '',
   chat_id: '',
+  hide_frontend_popup: false,
 })
 
 // 测试状态
@@ -172,6 +174,25 @@ onMounted(() => {
                   placeholder="请输入Chat ID (例如: 123456789 或 -123456789)" size="small" :disabled="isTesting"
                   @blur="saveTelegramConfig" />
               </div>
+            </div>
+          </div>
+
+          <!-- 隐藏前端弹窗设置 -->
+          <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <div class="w-1.5 h-1.5 bg-info rounded-full mr-3 flex-shrink-0" />
+                <div>
+                  <div class="text-sm font-medium leading-relaxed">
+                    隐藏前端弹窗
+                  </div>
+                  <div class="text-xs opacity-60">
+                    启用后仅通过Telegram交互，不显示前端弹窗界面
+                  </div>
+                </div>
+              </div>
+              <n-switch v-model:value="telegramConfig.hide_frontend_popup" size="small"
+                @update:value="saveTelegramConfig" />
             </div>
           </div>
 
