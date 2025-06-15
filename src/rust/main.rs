@@ -149,6 +149,7 @@ fn print_version() {
 
 /// 处理纯Telegram模式的MCP请求（不启动GUI）
 async fn handle_telegram_only_mcp_request(request_file: &str) -> Result<()> {
+    use cunzhi::config::load_standalone_config;
     use cunzhi::mcp::types::{build_continue_response, build_send_response, PopupRequest};
     use cunzhi::telegram::TelegramCore;
     use std::fs;
@@ -158,8 +159,9 @@ async fn handle_telegram_only_mcp_request(request_file: &str) -> Result<()> {
     let request_json = fs::read_to_string(request_file)?;
     let request: PopupRequest = serde_json::from_str(&request_json)?;
 
-    // 加载Telegram配置
-    let telegram_config = load_standalone_telegram_config()?;
+    // 加载完整配置
+    let app_config = load_standalone_config()?;
+    let telegram_config = &app_config.telegram_config;
 
     if !telegram_config.enabled {
         eprintln!("Telegram未启用，无法处理请求");
@@ -287,7 +289,7 @@ async fn handle_telegram_only_mcp_request(request_file: &str) -> Result<()> {
 
                                         let response = build_send_response(
                                             user_input_option,
-                                            selected_list,
+                                            selected_list.clone(),
                                             vec![], // 无GUI模式下没有图片
                                             Some(request.id.clone()),
                                             "telegram",
@@ -296,8 +298,14 @@ async fn handle_telegram_only_mcp_request(request_file: &str) -> Result<()> {
                                         // 输出JSON响应到stdout
                                         println!("{}", response);
 
-                                        // 发送确认消息
-                                        let _ = core.send_message("✅ 响应已发送").await;
+                                        // 发送确认消息（使用统一的反馈消息生成函数）
+                                        let feedback_message =
+                                            cunzhi::telegram::core::build_feedback_message(
+                                                &selected_list,
+                                                &user_input,
+                                                false, // 不是继续操作
+                                            );
+                                        let _ = core.send_message(&feedback_message).await;
                                         return Ok(());
                                     }
                                     cunzhi::telegram::TelegramEvent::ContinuePressed => {
@@ -310,8 +318,14 @@ async fn handle_telegram_only_mcp_request(request_file: &str) -> Result<()> {
                                         // 输出JSON响应到stdout
                                         println!("{}", response);
 
-                                        // 发送确认消息
-                                        let _ = core.send_message("✅ 继续操作已确认").await;
+                                        // 发送确认消息（使用统一的反馈消息生成函数）
+                                        let feedback_message =
+                                            cunzhi::telegram::core::build_feedback_message(
+                                                &[],  // 继续操作没有选项
+                                                "",   // 继续操作没有用户输入
+                                                true, // 是继续操作
+                                            );
+                                        let _ = core.send_message(&feedback_message).await;
                                         return Ok(());
                                     }
                                     cunzhi::telegram::TelegramEvent::TextUpdated { text } => {

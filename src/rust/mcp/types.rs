@@ -121,12 +121,13 @@ pub fn build_send_response(
 
 /// 构建继续操作的响应
 pub fn build_continue_response(request_id: Option<String>, source: &str) -> String {
-    let response = build_mcp_response(
-        Some("请按照最佳实践继续".to_string()),
-        vec![],
-        vec![],
-        request_id,
-        source,
-    );
+    // 动态获取继续提示词
+    let continue_prompt = if let Ok(config) = crate::config::load_standalone_config() {
+        config.reply_config.continue_prompt
+    } else {
+        "请按照最佳实践继续".to_string()
+    };
+
+    let response = build_mcp_response(Some(continue_prompt), vec![], vec![], request_id, source);
     response.to_string()
 }

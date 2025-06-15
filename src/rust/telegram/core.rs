@@ -276,6 +276,41 @@ pub async fn handle_text_message(
     Ok(None)
 }
 
+/// 生成统一的反馈消息
+pub fn build_feedback_message(
+    selected_options: &[String],
+    user_input: &str,
+    is_continue: bool,
+) -> String {
+    if is_continue {
+        // 继续操作的反馈消息
+        let continue_prompt = if let Ok(config) = crate::config::load_standalone_config() {
+            config.reply_config.continue_prompt
+        } else {
+            "请按照最佳实践继续".to_string()
+        };
+
+        format!("✅ 发送成功！\n\n📝 选中的选项：\n• ⏩ {}", continue_prompt)
+    } else {
+        // 发送操作的反馈消息
+        let mut feedback_message = "✅ 发送成功！\n\n📝 选中的选项：\n".to_string();
+
+        if selected_options.is_empty() {
+            feedback_message.push_str("• 无");
+        } else {
+            for opt in selected_options {
+                feedback_message.push_str(&format!("• {}\n", opt));
+            }
+        }
+
+        if !user_input.is_empty() {
+            feedback_message.push_str(&format!("\n📝 补充说明：\n{}", user_input));
+        }
+
+        feedback_message
+    }
+}
+
 /// 测试Telegram连接的通用函数
 pub async fn test_telegram_connection(bot_token: &str, chat_id: &str) -> Result<String> {
     if bot_token.trim().is_empty() {

@@ -57,7 +57,6 @@ async function toggleTelegramEnabled() {
   await saveTelegramConfig()
 }
 
-// 保存并测试连接
 async function saveAndTest() {
   if (!telegramConfig.value.bot_token.trim()) {
     message.warning('请输入Bot Token')
@@ -209,7 +208,7 @@ onMounted(() => {
                 </div>
                 <n-button type="primary" size="small" :loading="isTesting"
                   :disabled="!telegramConfig.bot_token.trim() || !telegramConfig.chat_id.trim()" @click="saveAndTest">
-                  {{ isTesting ? '测试中...' : '保存并测试' }}
+                  {{ isTesting ? '测试中...' : '测试连接' }}
                 </n-button>
               </div>
             </div>

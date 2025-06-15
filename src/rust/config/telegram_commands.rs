@@ -263,30 +263,24 @@ async fn start_telegram_listener(
                                         let selected_list: Vec<String> =
                                             selected_options.iter().cloned().collect();
 
-                                        let mut feedback_message =
-                                            "✅ 发送成功！\n\n📝 选中的选项：\n".to_string();
-
-                                        if selected_list.is_empty() {
-                                            feedback_message.push_str("• 无");
-                                        } else {
-                                            for opt in &selected_list {
-                                                feedback_message.push_str(&format!("• {}\n", opt));
-                                            }
-                                        }
-
-                                        if !user_input.is_empty() {
-                                            feedback_message.push_str(&format!(
-                                                "\n📝 补充说明：\n{}",
-                                                user_input
-                                            ));
-                                        }
+                                        // 使用统一的反馈消息生成函数
+                                        let feedback_message =
+                                            crate::telegram::core::build_feedback_message(
+                                                &selected_list,
+                                                &user_input,
+                                                false, // 不是继续操作
+                                            );
 
                                         let _ = core.send_message(&feedback_message).await;
                                     }
                                     crate::telegram::TelegramEvent::ContinuePressed => {
+                                        // 使用统一的反馈消息生成函数
                                         let feedback_message =
-                                            "✅ 发送成功！\n\n📝 选中的选项：\n• ⏩ 继续操作！"
-                                                .to_string();
+                                            crate::telegram::core::build_feedback_message(
+                                                &[],  // 继续操作没有选项
+                                                "",   // 继续操作没有用户输入
+                                                true, // 是继续操作
+                                            );
 
                                         let _ = core.send_message(&feedback_message).await;
                                     }
