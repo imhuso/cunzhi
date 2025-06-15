@@ -133,82 +133,68 @@ onMounted(() => {
             </div>
           </div>
         </div>
-        <n-switch
-          :value="telegramConfig.enabled"
-          size="small"
-          @update:value="toggleTelegramEnabled"
-        />
+        <n-switch :value="telegramConfig.enabled" size="small" @update:value="toggleTelegramEnabled" />
       </div>
 
-      <!-- Bot Token设置 -->
-      <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
-        <div class="flex items-start">
-          <div class="w-1.5 h-1.5 bg-info rounded-full mr-3 mt-2 flex-shrink-0" />
-          <div class="flex-1">
-            <div class="text-sm font-medium mb-3 leading-relaxed">
-              Bot Token
+      <!-- 配置项区域 - 条件显示 -->
+      <n-collapse-transition :show="telegramConfig.enabled">
+        <n-space vertical size="large">
+          <!-- Bot Token设置 -->
+          <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div class="flex items-start">
+              <div class="w-1.5 h-1.5 bg-info rounded-full mr-3 mt-2 flex-shrink-0" />
+              <div class="flex-1">
+                <div class="text-sm font-medium mb-3 leading-relaxed">
+                  Bot Token
+                </div>
+                <div class="text-xs opacity-60 mb-3">
+                  从 @BotFather 获取的Bot Token，用于验证Bot身份
+                </div>
+                <n-input v-model:value="telegramConfig.bot_token" type="text"
+                  placeholder="请输入Bot Token (例如: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)" size="small"
+                  :disabled="isTesting" @blur="saveTelegramConfig" />
+              </div>
             </div>
-            <div class="text-xs opacity-60 mb-3">
-              从 @BotFather 获取的Bot Token，用于验证Bot身份
-            </div>
-            <n-input
-              v-model:value="telegramConfig.bot_token"
-              type="text"
-              placeholder="请输入Bot Token (例如: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)"
-              size="small"
-              :disabled="isTesting"
-              @blur="saveTelegramConfig"
-            />
           </div>
-        </div>
-      </div>
 
-      <!-- Chat ID设置 -->
-      <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
-        <div class="flex items-start">
-          <div class="w-1.5 h-1.5 bg-info rounded-full mr-3 mt-2 flex-shrink-0" />
-          <div class="flex-1">
-            <div class="text-sm font-medium mb-3 leading-relaxed">
-              Chat ID
+          <!-- Chat ID设置 -->
+          <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div class="flex items-start">
+              <div class="w-1.5 h-1.5 bg-info rounded-full mr-3 mt-2 flex-shrink-0" />
+              <div class="flex-1">
+                <div class="text-sm font-medium mb-3 leading-relaxed">
+                  Chat ID
+                </div>
+                <div class="text-xs opacity-60 mb-3">
+                  目标聊天的ID，可以是个人聊天或群组聊天的ID
+                </div>
+                <n-input v-model:value="telegramConfig.chat_id" type="text"
+                  placeholder="请输入Chat ID (例如: 123456789 或 -123456789)" size="small" :disabled="isTesting"
+                  @blur="saveTelegramConfig" />
+              </div>
             </div>
-            <div class="text-xs opacity-60 mb-3">
-              目标聊天的ID，可以是个人聊天或群组聊天的ID
-            </div>
-            <n-input
-              v-model:value="telegramConfig.chat_id"
-              type="text"
-              placeholder="请输入Chat ID (例如: 123456789 或 -123456789)"
-              size="small"
-              :disabled="isTesting"
-              @blur="saveTelegramConfig"
-            />
           </div>
-        </div>
-      </div>
 
-      <!-- 保存并测试按钮 -->
-      <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
-        <div class="flex items-start">
-          <div class="w-1.5 h-1.5 bg-info rounded-full mr-3 mt-2 flex-shrink-0" />
-          <div class="flex-1">
-            <div class="text-sm font-medium mb-3 leading-relaxed">
-              连接测试
+          <!-- 保存并测试按钮 -->
+          <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div class="flex items-start">
+              <div class="w-1.5 h-1.5 bg-info rounded-full mr-3 mt-2 flex-shrink-0" />
+              <div class="flex-1">
+                <div class="text-sm font-medium mb-3 leading-relaxed">
+                  连接测试
+                </div>
+                <div class="text-xs opacity-60 mb-3">
+                  保存配置并发送测试消息验证连接
+                </div>
+                <n-button type="primary" size="small" :loading="isTesting"
+                  :disabled="!telegramConfig.bot_token.trim() || !telegramConfig.chat_id.trim()" @click="saveAndTest">
+                  {{ isTesting ? '测试中...' : '保存并测试' }}
+                </n-button>
+              </div>
             </div>
-            <div class="text-xs opacity-60 mb-3">
-              保存配置并发送测试消息验证连接
-            </div>
-            <n-button
-              type="primary"
-              size="small"
-              :loading="isTesting"
-              :disabled="!telegramConfig.bot_token.trim() || !telegramConfig.chat_id.trim()"
-              @click="saveAndTest"
-            >
-              {{ isTesting ? '测试中...' : '保存并测试' }}
-            </n-button>
           </div>
-        </div>
-      </div>
+        </n-space>
+      </n-collapse-transition>
     </n-space>
   </n-card>
 </template>
