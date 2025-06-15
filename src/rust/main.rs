@@ -54,7 +54,7 @@ pub fn run() {
             select_image_files,
             get_telegram_config,
             set_telegram_config,
-            test_telegram_connection,
+            test_telegram_connection_cmd,
             start_telegram_sync,
             exit_app
         ])

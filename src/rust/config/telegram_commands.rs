@@ -1,14 +1,9 @@
 use crate::config::{save_config, AppState, TelegramConfig};
-use crate::telegram::process_telegram_markdown;
-use tauri::{AppHandle, Emitter, State};
-use teloxide::{
-    prelude::*,
-    types::{
-        ChatId, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup,
-        MessageId, ParseMode,
-    },
-    Bot,
+use crate::telegram::{
+    handle_callback_query, handle_text_message, test_telegram_connection, TelegramCore,
 };
+use tauri::{AppHandle, Emitter, State};
+use teloxide::prelude::*;
 
 /// 获取Telegram配置
 #[tauri::command]
@@ -45,37 +40,13 @@ pub async fn set_telegram_config(
 
 /// 测试Telegram Bot连接
 #[tauri::command]
-pub async fn test_telegram_connection(
+pub async fn test_telegram_connection_cmd(
     bot_token: String,
     chat_id: String,
 ) -> Result<String, String> {
-    if bot_token.trim().is_empty() {
-        return Err("Bot Token不能为空".to_string());
-    }
-
-    if chat_id.trim().is_empty() {
-        return Err("Chat ID不能为空".to_string());
-    }
-
-    // 创建Bot实例
-    let bot = Bot::new(bot_token);
-
-    // 验证Chat ID格式
-    let chat_id_parsed: i64 = chat_id
-        .parse()
-        .map_err(|_| "Chat ID格式无效，请输入有效的数字ID".to_string())?;
-
-    // 发送测试消息
-    let test_message =
-        "🤖 寸止应用测试消息\n\n这是一条来自寸止应用的测试消息，表示Telegram Bot配置成功！";
-
-    match bot.send_message(ChatId(chat_id_parsed), test_message).await {
-        Ok(_) => Ok("测试消息发送成功！Telegram Bot配置正确。".to_string()),
-        Err(e) => {
-            let error_msg = format!("发送测试消息失败: {}", e);
-            Err(error_msg)
-        }
-    }
+    test_telegram_connection(&bot_token, &chat_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// 发送Telegram消息（供其他模块调用）
@@ -94,25 +65,12 @@ pub async fn send_telegram_message_with_markdown(
     message: &str,
     use_markdown: bool,
 ) -> Result<(), String> {
-    if bot_token.trim().is_empty() || chat_id.trim().is_empty() {
-        return Err("Bot Token或Chat ID未配置".to_string());
-    }
+    let core =
+        TelegramCore::new(bot_token.to_string(), chat_id.to_string()).map_err(|e| e.to_string())?;
 
-    let bot = Bot::new(bot_token);
-    let chat_id_parsed: i64 = chat_id.parse().map_err(|_| "Chat ID格式无效".to_string())?;
-
-    let mut send_request = bot.send_message(ChatId(chat_id_parsed), message);
-
-    // 如果启用Markdown，设置解析模式
-    if use_markdown {
-        send_request = send_request.parse_mode(ParseMode::MarkdownV2);
-    }
-
-    send_request
+    core.send_message_with_markdown(message, use_markdown)
         .await
-        .map_err(|e| format!("发送消息失败: {}", e))?;
-
-    Ok(())
+        .map_err(|e| e.to_string())
 }
 
 /// 启动Telegram同步（完整版本）
@@ -146,198 +104,280 @@ pub async fn start_telegram_sync(
         return Err("Telegram配置不完整".to_string());
     }
 
-    // 发送消息一：选项消息（带inline keyboard）
-    send_options_message(
-        &bot_token,
-        &chat_id,
-        &message,
-        &predefined_options,
-        is_markdown,
-    )
-    .await?;
+    // 创建Telegram核心实例
+    let core = TelegramCore::new(bot_token.clone(), chat_id.clone())
+        .map_err(|e| format!("创建Telegram核心失败: {}", e))?;
+
+    // 发送选项消息
+    core.send_options_message(&message, &predefined_options, is_markdown)
+        .await
+        .map_err(|e| format!("发送选项消息失败: {}", e))?;
 
     // 短暂延迟确保消息顺序
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    // 发送消息二：操作消息（带reply keyboard）
-    send_operation_message(&bot_token, &chat_id, continue_reply_enabled).await?;
+    // 发送操作消息
+    core.send_operation_message(continue_reply_enabled)
+        .await
+        .map_err(|e| format!("发送操作消息失败: {}", e))?;
 
     // 启动消息监听（如果有预定义选项）
     if !predefined_options.is_empty() {
+        println!(
+            "🤖 [Telegram] 启动消息监听，选项数量: {}",
+            predefined_options.len()
+        );
         let bot_token_clone = bot_token.clone();
         let chat_id_clone = chat_id.clone();
         let app_handle_clone = app_handle.clone();
 
         tokio::spawn(async move {
-            let _ = start_telegram_listener(bot_token_clone, chat_id_clone, app_handle_clone).await;
+            println!("🤖 [Telegram] 消息监听任务已启动");
+            match start_telegram_listener(
+                bot_token_clone,
+                chat_id_clone,
+                app_handle_clone,
+                predefined_options,
+            )
+            .await
+            {
+                Ok(_) => println!("🤖 [Telegram] 消息监听正常结束"),
+                Err(e) => println!("🤖 [Telegram] 消息监听出错: {}", e),
+            }
         });
-    }
-
-    Ok(())
-}
-
-/// 发送选项消息（消息一）
-async fn send_options_message(
-    bot_token: &str,
-    chat_id: &str,
-    message: &str,
-    predefined_options: &[String],
-    is_markdown: bool,
-) -> Result<(), String> {
-    let bot = Bot::new(bot_token);
-    let chat_id_parsed: i64 = chat_id.parse().map_err(|_| "Chat ID格式无效".to_string())?;
-
-    // 处理消息内容
-    let processed_message = if is_markdown {
-        process_telegram_markdown(message)
     } else {
-        message.to_string()
-    };
-
-    // 创建inline keyboard
-    let mut keyboard_rows = Vec::new();
-
-    // 添加选项按钮（每行最多2个）
-    for chunk in predefined_options.chunks(2) {
-        let mut row = Vec::new();
-        for option in chunk {
-            let callback_data = format!("toggle:{}", option);
-            row.push(InlineKeyboardButton::callback(
-                format!("☐ {}", option),
-                callback_data,
-            ));
-        }
-        keyboard_rows.push(row);
-    }
-
-    let inline_keyboard = InlineKeyboardMarkup::new(keyboard_rows);
-
-    // 发送消息
-    let mut send_request = bot
-        .send_message(ChatId(chat_id_parsed), processed_message)
-        .reply_markup(inline_keyboard);
-
-    // 如果是Markdown，设置解析模式
-    if is_markdown {
-        send_request = send_request.parse_mode(ParseMode::MarkdownV2);
-    }
-
-    match send_request.await {
-        Ok(_) => {}
-        Err(e) => {
-            let error_str = e.to_string();
-            // 检查是否是JSON解析错误但消息实际发送成功
-            let has_parsing_json = error_str.contains("parsing JSON");
-            let has_ok_true = error_str.contains("\\\"ok\\\":true");
-
-            if has_parsing_json && has_ok_true {
-                // 消息实际发送成功，继续执行
-            } else {
-                return Err(format!("发送选项消息失败: {}", e));
-            }
-        }
+        println!("🤖 [Telegram] 没有预定义选项，跳过消息监听启动");
     }
 
     Ok(())
 }
 
-/// 发送操作消息（消息二）
-async fn send_operation_message(
-    bot_token: &str,
-    chat_id: &str,
-    continue_reply_enabled: bool,
-) -> Result<(), String> {
-    let bot = Bot::new(bot_token);
-    let chat_id_parsed: i64 = chat_id.parse().map_err(|_| "Chat ID格式无效".to_string())?;
-
-    // 创建reply keyboard
-    let mut keyboard_buttons = vec![KeyboardButton::new("↗️发送")];
-
-    if continue_reply_enabled {
-        keyboard_buttons.insert(0, KeyboardButton::new("⏩继续"));
-    }
-
-    let reply_keyboard = KeyboardMarkup::new(vec![keyboard_buttons])
-        .resize_keyboard(true)
-        .one_time_keyboard(false);
-
-    // 发送操作消息
-    let operation_message = "键盘上选择操作完成对话";
-
-    match bot
-        .send_message(ChatId(chat_id_parsed), operation_message)
-        .reply_markup(reply_keyboard)
-        .await
-    {
-        Ok(_) => {}
-        Err(e) => {
-            let error_str = e.to_string();
-            // 检查是否是JSON解析错误但消息实际发送成功
-            if error_str.contains("parsing JSON") && error_str.contains("\\\"ok\\\":true") {
-                // 消息实际发送成功，继续执行
-            } else {
-                return Err(format!("发送操作消息失败: {}", e));
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// 启动Telegram消息监听
+/// 启动Telegram消息监听（简化版本）
 async fn start_telegram_listener(
     bot_token: String,
     chat_id: String,
     app_handle: AppHandle,
+    predefined_options_list: Vec<String>,
 ) -> Result<(), String> {
-    let bot = Bot::new(bot_token);
-    let chat_id_parsed: i64 = chat_id.parse().map_err(|_| "Chat ID格式无效".to_string())?;
-    let target_chat_id = ChatId(chat_id_parsed);
+    println!("🤖 [Telegram] 创建监听器，Chat ID: {}", chat_id);
+
+    let core = TelegramCore::new(bot_token, chat_id)
+        .map_err(|e| format!("创建Telegram核心失败: {}", e))?;
 
     let mut offset = 0;
-    let mut _operation_message_id: Option<i32> = None;
+
+    // 用于跟踪选项状态和消息ID
+    let mut selected_options: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut options_message_id: Option<i32> = None;
+    let predefined_options = predefined_options_list;
 
     // 获取当前最新的消息ID作为基准
-    if let Ok(updates) = bot.get_updates().limit(10).await {
+    if let Ok(updates) = core.bot.get_updates().limit(10).await {
         if let Some(update) = updates.last() {
             offset = update.id + 1;
+            println!("🤖 [Telegram] 设置起始偏移量: {}", offset);
         }
     }
 
     // 监听循环
+    println!("🤖 [Telegram] 开始监听循环");
     loop {
-        match bot.get_updates().offset(offset).timeout(10).await {
+        match core.bot.get_updates().offset(offset).timeout(10).await {
             Ok(updates) => {
+                if !updates.is_empty() {
+                    println!("🤖 [Telegram] 简化监听器收到 {} 个更新", updates.len());
+                }
+
                 for update in updates {
                     offset = update.id + 1;
+                    println!("🤖 [Telegram] 简化监听器处理更新 ID: {}", update.id);
 
-                    match &update.kind {
-                        teloxide::types::UpdateKind::Message(_) => {
-                            // 将在后面单独处理
+                    match update.kind {
+                        teloxide::types::UpdateKind::CallbackQuery(callback_query) => {
+                            println!(
+                                "🤖 [Telegram] 简化监听器收到 CallbackQuery: {:?}",
+                                callback_query.data
+                            );
+
+                            if let Ok(Some(option)) =
+                                handle_callback_query(&core.bot, &callback_query, core.chat_id)
+                                    .await
+                            {
+                                // 切换选项状态
+                                let selected = if selected_options.contains(&option) {
+                                    selected_options.remove(&option);
+                                    false
+                                } else {
+                                    selected_options.insert(option.clone());
+                                    true
+                                };
+
+                                println!(
+                                    "🤖 [Telegram] 选项 '{}' 状态切换为: {}",
+                                    option, selected
+                                );
+
+                                // 发送事件到前端
+                                use crate::telegram::TelegramEvent;
+                                let event = TelegramEvent::OptionToggled {
+                                    option: option.clone(),
+                                    selected,
+                                };
+
+                                println!("🤖 [Telegram] 简化监听器发送事件: {:?}", event);
+                                match app_handle.emit("telegram-event", &event) {
+                                    Ok(_) => println!("🤖 [Telegram] ✅ 简化监听器事件发送成功"),
+                                    Err(e) => {
+                                        println!("🤖 [Telegram] ❌ 简化监听器事件发送失败: {}", e)
+                                    }
+                                }
+
+                                // 更新按钮状态
+                                if let Some(msg_id) = options_message_id {
+                                    let selected_vec: Vec<String> =
+                                        selected_options.iter().cloned().collect();
+                                    match core
+                                        .update_inline_keyboard(
+                                            msg_id,
+                                            &predefined_options,
+                                            &selected_vec,
+                                        )
+                                        .await
+                                    {
+                                        Ok(_) => println!("🤖 [Telegram] ✅ 按钮状态更新成功"),
+                                        Err(e) => {
+                                            println!("🤖 [Telegram] ⚠️ 按钮状态更新失败: {}", e)
+                                        }
+                                    }
+                                } else {
+                                    println!("🤖 [Telegram] ⚠️ 未找到选项消息ID，无法更新按钮状态");
+                                }
+                            } else {
+                                println!("🤖 [Telegram] CallbackQuery 处理返回 None 或失败");
+                            }
                         }
-                        teloxide::types::UpdateKind::CallbackQuery(_) => {
-                            // 将在后面单独处理
+                        teloxide::types::UpdateKind::Message(message) => {
+                            println!(
+                                "🤖 [Telegram] 简化监听器收到消息: {:?} 来自聊天: {}",
+                                message.text(),
+                                message.chat.id
+                            );
+
+                            // 检查是否是包含 inline keyboard 的选项消息
+                            if let Some(inline_keyboard) = message.reply_markup() {
+                                // 检查是否包含我们的选项按钮
+                                let mut contains_our_options = false;
+                                for row in &inline_keyboard.inline_keyboard {
+                                    for button in row {
+                                        if let teloxide::types::InlineKeyboardButtonKind::CallbackData(callback_data) = &button.kind {
+                                            if callback_data.starts_with("toggle:") {
+                                                contains_our_options = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if contains_our_options {
+                                        break;
+                                    }
+                                }
+
+                                if contains_our_options {
+                                    options_message_id = Some(message.id.0);
+                                    println!("🤖 [Telegram] 检测到选项消息，ID: {}", message.id.0);
+                                }
+                            }
+
+                            if let Ok(Some(event)) = handle_text_message(
+                                &message,
+                                core.chat_id,
+                                None, // 简化版本不过滤消息ID
+                            )
+                            .await
+                            {
+                                println!("🤖 [Telegram] 简化监听器文本处理成功: {:?}", event);
+                                match app_handle.emit("telegram-event", &event) {
+                                    Ok(_) => {
+                                        println!("🤖 [Telegram] ✅ 简化监听器文本事件发送成功")
+                                    }
+                                    Err(e) => println!(
+                                        "🤖 [Telegram] ❌ 简化监听器文本事件发送失败: {}",
+                                        e
+                                    ),
+                                }
+                            }
                         }
-                        teloxide::types::UpdateKind::InlineQuery(_) => {}
-                        teloxide::types::UpdateKind::ChosenInlineResult(_) => {}
-                        teloxide::types::UpdateKind::EditedMessage(_) => {}
-                        teloxide::types::UpdateKind::ChannelPost(_) => {}
-                        teloxide::types::UpdateKind::EditedChannelPost(_) => {}
-                        teloxide::types::UpdateKind::ShippingQuery(_) => {}
-                        teloxide::types::UpdateKind::PreCheckoutQuery(_) => {}
-                        teloxide::types::UpdateKind::Poll(_) => {}
-                        teloxide::types::UpdateKind::PollAnswer(_) => {}
-                        teloxide::types::UpdateKind::MyChatMember(_) => {}
-                        teloxide::types::UpdateKind::ChatMember(_) => {}
-                        teloxide::types::UpdateKind::ChatJoinRequest(_) => {}
-                        teloxide::types::UpdateKind::Error(err) => {
-                            // 检查错误是否包含callback_query数据
-                            let err_str = err.to_string();
-                            if err_str.contains("callback_query") {
-                                // 尝试从错误字符串中提取callback_query数据
-                                if let Some(start) = err_str.find("\"data\":\"") {
-                                    if let Some(end) = err_str[start + 8..].find("\"") {
-                                        let callback_data = &err_str[start + 8..start + 8 + end];
+                        teloxide::types::UpdateKind::InlineQuery(inline_query) => {
+                            println!("🤖 [Telegram] 收到 InlineQuery: {:?}", inline_query.query);
+                        }
+                        teloxide::types::UpdateKind::ChosenInlineResult(chosen_result) => {
+                            println!(
+                                "🤖 [Telegram] 收到 ChosenInlineResult: {:?}",
+                                chosen_result.result_id
+                            );
+                        }
+                        teloxide::types::UpdateKind::EditedMessage(edited_message) => {
+                            println!(
+                                "🤖 [Telegram] 收到 EditedMessage: {:?}",
+                                edited_message.text()
+                            );
+                        }
+                        teloxide::types::UpdateKind::ChannelPost(channel_post) => {
+                            println!("🤖 [Telegram] 收到 ChannelPost: {:?}", channel_post.text());
+                        }
+                        teloxide::types::UpdateKind::EditedChannelPost(edited_channel_post) => {
+                            println!(
+                                "🤖 [Telegram] 收到 EditedChannelPost: {:?}",
+                                edited_channel_post.text()
+                            );
+                        }
+                        teloxide::types::UpdateKind::ShippingQuery(shipping_query) => {
+                            println!("🤖 [Telegram] 收到 ShippingQuery: {:?}", shipping_query.id);
+                        }
+                        teloxide::types::UpdateKind::PreCheckoutQuery(pre_checkout_query) => {
+                            println!(
+                                "🤖 [Telegram] 收到 PreCheckoutQuery: {:?}",
+                                pre_checkout_query.id
+                            );
+                        }
+                        teloxide::types::UpdateKind::Poll(poll) => {
+                            println!("🤖 [Telegram] 收到 Poll: {:?}", poll.id);
+                        }
+                        teloxide::types::UpdateKind::PollAnswer(poll_answer) => {
+                            println!("🤖 [Telegram] 收到 PollAnswer: {:?}", poll_answer.poll_id);
+                        }
+                        teloxide::types::UpdateKind::MyChatMember(my_chat_member) => {
+                            println!(
+                                "🤖 [Telegram] 收到 MyChatMember: {:?}",
+                                my_chat_member.chat.id
+                            );
+                        }
+                        teloxide::types::UpdateKind::ChatMember(chat_member) => {
+                            println!("🤖 [Telegram] 收到 ChatMember: {:?}", chat_member.chat.id);
+                        }
+                        teloxide::types::UpdateKind::ChatJoinRequest(chat_join_request) => {
+                            println!(
+                                "🤖 [Telegram] 收到 ChatJoinRequest: {:?}",
+                                chat_join_request.chat.id
+                            );
+                        }
+                        teloxide::types::UpdateKind::Error(error) => {
+                            println!("🤖 [Telegram] 收到 Error: {:?}", error);
+
+                            // 尝试从错误中提取 callback_query 数据
+                            let error_str = error.to_string();
+                            if error_str.contains("callback_query") {
+                                println!(
+                                    "🤖 [Telegram] 在 Error 中发现 callback_query 数据，尝试处理"
+                                );
+
+                                // 提取 callback_query 的 data 字段
+                                if let Some(start) = error_str.find("\"data\":\"") {
+                                    if let Some(end) = error_str[start + 8..].find("\"") {
+                                        let callback_data = &error_str[start + 8..start + 8 + end];
+                                        println!(
+                                            "🤖 [Telegram] 提取到 callback_data: {}",
+                                            callback_data
+                                        );
 
                                         if callback_data.starts_with("toggle:") {
                                             let option = callback_data
@@ -345,205 +385,124 @@ async fn start_telegram_listener(
                                                 .unwrap()
                                                 .to_string();
 
-                                            // 发送事件到前端
-                                            let event = serde_json::json!({
-                                                "type": "option_toggled",
-                                                "option": option
-                                            });
+                                            println!(
+                                                "🤖 [Telegram] 从 Error 中提取到选项: {}",
+                                                option
+                                            );
 
-                                            let _ = app_handle.emit("telegram-event", &event);
+                                            // 切换选项状态
+                                            let selected = if selected_options.contains(&option) {
+                                                selected_options.remove(&option);
+                                                false
+                                            } else {
+                                                selected_options.insert(option.clone());
+                                                true
+                                            };
 
-                                            // 尝试提取callback query ID和消息ID
-                                            if let Some(id_start) = err_str.find("\"id\":\"") {
-                                                if let Some(id_end) =
-                                                    err_str[id_start + 6..].find("\"")
-                                                {
-                                                    let callback_id = &err_str
-                                                        [id_start + 6..id_start + 6 + id_end];
+                                            println!(
+                                                "🤖 [Telegram] 从 Error 中选项 '{}' 状态切换为: {}",
+                                                option, selected
+                                            );
 
-                                                    // 提取消息ID用于编辑
-                                                    let message_id = if let Some(msg_start) =
-                                                        err_str.find("\"message_id\":")
+                                            // 发送选项切换事件
+                                            use crate::telegram::TelegramEvent;
+                                            let event = TelegramEvent::OptionToggled {
+                                                option: option.clone(),
+                                                selected,
+                                            };
+
+                                            println!(
+                                                "🤖 [Telegram] 从 Error 中发送事件: {:?}",
+                                                event
+                                            );
+                                            match app_handle.emit("telegram-event", &event) {
+                                                Ok(_) => println!(
+                                                    "🤖 [Telegram] ✅ Error 中的事件发送成功"
+                                                ),
+                                                Err(e) => println!(
+                                                    "🤖 [Telegram] ❌ Error 中的事件发送失败: {}",
+                                                    e
+                                                ),
+                                            }
+
+                                            // 更新按钮状态
+                                            if let Some(msg_id) = options_message_id {
+                                                let selected_vec: Vec<String> =
+                                                    selected_options.iter().cloned().collect();
+                                                match core.update_inline_keyboard(msg_id, &predefined_options, &selected_vec).await {
+                                                    Ok(_) => println!("🤖 [Telegram] ✅ 从 Error 中按钮状态更新成功"),
+                                                    Err(e) => println!("🤖 [Telegram] ⚠️ 从 Error 中按钮状态更新失败: {}", e),
+                                                }
+                                            } else {
+                                                println!("🤖 [Telegram] ⚠️ 从 Error 中未找到选项消息ID，无法更新按钮状态");
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 尝试从 callback_query 中提取消息ID
+                                if options_message_id.is_none() {
+                                    if let Some(msg_start) = error_str.find("\"message_id\":") {
+                                        // 找到数字部分
+                                        let after_colon = &error_str[msg_start + 13..]; // "message_id":".len() = 13
+                                        if let Some(number_start) =
+                                            after_colon.find(char::is_numeric)
+                                        {
+                                            if let Some(number_end) = after_colon[number_start..]
+                                                .find(|c: char| !c.is_numeric())
+                                            {
+                                                let number_str = &after_colon
+                                                    [number_start..number_start + number_end];
+                                                if let Ok(msg_id) = number_str.parse::<i32>() {
+                                                    options_message_id = Some(msg_id);
+                                                    println!(
+                                                        "🤖 [Telegram] 从 Error 中提取到消息ID: {}",
+                                                        msg_id
+                                                    );
+
+                                                    // 立即更新按钮状态
+                                                    let selected_vec: Vec<String> =
+                                                        selected_options.iter().cloned().collect();
+                                                    if let Err(e) = core
+                                                        .update_inline_keyboard(
+                                                            msg_id,
+                                                            &predefined_options,
+                                                            &selected_vec,
+                                                        )
+                                                        .await
                                                     {
-                                                        if let Some(msg_end) =
-                                                            err_str[msg_start + 13..].find(",")
-                                                        {
-                                                            err_str[msg_start + 13
-                                                                ..msg_start + 13 + msg_end]
-                                                                .parse::<i32>()
-                                                                .ok()
-                                                        } else {
-                                                            None
-                                                        }
+                                                        println!("🤖 [Telegram] ❌ 从 Error 中更新按钮状态失败: {}", e);
                                                     } else {
-                                                        None
-                                                    };
-
-                                                    // 回答callback query并尝试更新按钮状态
-                                                    let bot_clone = bot.clone();
-                                                    let callback_id_clone = callback_id.to_string();
-                                                    let _option_clone = option.clone();
-                                                    let _chat_id_clone = target_chat_id;
-
-                                                    tokio::spawn(async move {
-                                                        // 回答callback query
-                                                        let _ = bot_clone
-                                                            .answer_callback_query(
-                                                                callback_id_clone,
-                                                            )
-                                                            .await;
-
-                                                        // 尝试更新按钮状态
-                                                        if let Some(msg_id) = message_id {
-                                                            // 从错误字符串中提取真实的选项列表
-                                                            let mut real_options = Vec::new();
-
-                                                            // 解析inline_keyboard中的所有选项
-                                                            if let Some(keyboard_start) =
-                                                                err_str.find("\"inline_keyboard\":")
-                                                            {
-                                                                let keyboard_section =
-                                                                    &err_str[keyboard_start..];
-
-                                                                // 查找所有callback_data中的toggle:选项
-                                                                let mut pos = 0;
-                                                                while let Some(toggle_pos) =
-                                                                    keyboard_section[pos..]
-                                                                        .find("toggle:")
-                                                                {
-                                                                    let start =
-                                                                        pos + toggle_pos + 7; // "toggle:".len()
-                                                                    if let Some(end) =
-                                                                        keyboard_section[start..]
-                                                                            .find("\"")
-                                                                    {
-                                                                        let option =
-                                                                            keyboard_section[start
-                                                                                ..start + end]
-                                                                                .to_string();
-                                                                        if !real_options
-                                                                            .contains(&option)
-                                                                        {
-                                                                            real_options
-                                                                                .push(option);
-                                                                        }
-                                                                    }
-                                                                    pos = start;
-                                                                }
-                                                            }
-
-                                                            // 如果没有找到选项，使用默认选项
-                                                            if real_options.is_empty() {
-                                                                real_options = vec![
-                                                                    "只修改性能问题".to_string(),
-                                                                    "需要更详细的说明".to_string(),
-                                                                    "代码风格问题".to_string(),
-                                                                    "安全性问题".to_string(),
-                                                                    "功能性问题".to_string(),
-                                                                ];
-                                                            }
-
-                                                            // 从错误字符串中解析当前选中的选项
-                                                            let mut selected_options =
-                                                                std::collections::HashSet::new();
-
-                                                            // 查找所有已选中的按钮（包含☑️的）
-                                                            for option in &real_options {
-                                                                let selected_pattern =
-                                                                    format!("☑️ {}", option);
-                                                                if err_str
-                                                                    .contains(&selected_pattern)
-                                                                {
-                                                                    selected_options
-                                                                        .insert(option.clone());
-                                                                }
-                                                            }
-
-                                                            // 切换当前点击的选项状态
-                                                            if selected_options
-                                                                .contains(&_option_clone)
-                                                            {
-                                                                selected_options
-                                                                    .remove(&_option_clone);
-                                                            } else {
-                                                                selected_options
-                                                                    .insert(_option_clone.clone());
-                                                            }
-
-                                                            // 创建更新后的keyboard
-                                                            let mut keyboard_rows = Vec::new();
-                                                            for chunk in real_options.chunks(2) {
-                                                                let mut row = Vec::new();
-                                                                for option in chunk {
-                                                                    let callback_data = format!(
-                                                                        "toggle:{}",
-                                                                        option
-                                                                    );
-                                                                    // 根据选中状态显示按钮
-                                                                    let button_text =
-                                                                        if selected_options
-                                                                            .contains(option)
-                                                                        {
-                                                                            format!("☑️ {}", option)
-                                                                        } else {
-                                                                            format!("☐ {}", option)
-                                                                        };
-                                                                    row.push(InlineKeyboardButton::callback(
-                                                                        button_text,
-                                                                        callback_data,
-                                                                    ));
-                                                                }
-                                                                keyboard_rows.push(row);
-                                                            }
-
-                                                            let new_keyboard =
-                                                                InlineKeyboardMarkup::new(
-                                                                    keyboard_rows,
-                                                                );
-
-                                                            // 更新消息的reply_markup
-                                                            let _ = bot_clone
-                                                                .edit_message_reply_markup(
-                                                                    _chat_id_clone,
-                                                                    MessageId(msg_id),
-                                                                )
-                                                                .reply_markup(new_keyboard)
-                                                                .await;
-                                                        }
-                                                    });
+                                                        println!("🤖 [Telegram] ✅ 从 Error 中更新按钮状态成功");
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }
-                        }
-                    }
 
-                    // 处理callback query（inline keyboard点击）
-                    if let teloxide::types::UpdateKind::CallbackQuery(callback_query) = &update.kind
-                    {
-                        if let Some(message) = &callback_query.message {
-                            if message.chat.id == target_chat_id {
-                                handle_callback_query(&bot, callback_query.clone(), &app_handle)
-                                    .await;
-                            }
-                        }
-                    }
+                                // 尝试提取 callback query ID 并回答
+                                if let Some(id_start) = error_str.find("\"id\":\"") {
+                                    if let Some(id_end) = error_str[id_start + 6..].find("\"") {
+                                        let callback_id =
+                                            &error_str[id_start + 6..id_start + 6 + id_end];
+                                        println!(
+                                            "🤖 [Telegram] 提取到 callback_id: {}",
+                                            callback_id
+                                        );
 
-                    // 处理文本消息
-                    if let teloxide::types::UpdateKind::Message(message) = &update.kind {
-                        if message.chat.id == target_chat_id {
-                            // 检查是否是操作消息（包含"键盘上选择操作完成对话"）
-                            if let Some(text) = message.text() {
-                                if text == "键盘上选择操作完成对话" {
-                                    _operation_message_id = Some(message.id.0);
-                                    continue;
+                                        // 异步回答 callback query
+                                        let bot_clone = core.bot.clone();
+                                        let callback_id_clone = callback_id.to_string();
+                                        tokio::spawn(async move {
+                                            match bot_clone.answer_callback_query(callback_id_clone).await {
+                                                Ok(_) => println!("🤖 [Telegram] ✅ 从 Error 中回答 callback query 成功"),
+                                                Err(e) => println!("🤖 [Telegram] ❌ 从 Error 中回答 callback query 失败: {}", e),
+                                            }
+                                        });
+                                    }
                                 }
                             }
-
-                            // 处理用户消息
-                            handle_text_message(&message, &app_handle).await;
                         }
                     }
                 }
@@ -555,53 +514,5 @@ async fn start_telegram_listener(
 
         // 短暂延迟避免过于频繁的请求
         tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
-    }
-}
-
-/// 处理callback query（inline keyboard点击）
-async fn handle_callback_query(bot: &Bot, callback_query: CallbackQuery, app_handle: &AppHandle) {
-    if let Some(data) = callback_query.data {
-        if data.starts_with("toggle:") {
-            let option = data.strip_prefix("toggle:").unwrap().to_string();
-
-            // 发送事件到前端
-            let event = serde_json::json!({
-                "type": "option_toggled",
-                "option": option
-            });
-
-            let _ = app_handle.emit("telegram-event", &event);
-        }
-    }
-
-    // 回答callback query
-    let _ = bot.answer_callback_query(callback_query.id).await;
-}
-
-/// 处理文本消息
-async fn handle_text_message(message: &teloxide::types::Message, app_handle: &AppHandle) {
-    if let Some(text) = message.text() {
-        match text {
-            "⏩继续" => {
-                let event = serde_json::json!({
-                    "type": "continue_pressed"
-                });
-                let _ = app_handle.emit("telegram-event", &event);
-            }
-            "↗️发送" => {
-                let event = serde_json::json!({
-                    "type": "send_pressed"
-                });
-                let _ = app_handle.emit("telegram-event", &event);
-            }
-            _ => {
-                // 普通文本输入
-                let event = serde_json::json!({
-                    "type": "text_updated",
-                    "text": text
-                });
-                let _ = app_handle.emit("telegram-event", &event);
-            }
-        }
     }
 }

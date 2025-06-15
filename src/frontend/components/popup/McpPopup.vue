@@ -128,29 +128,40 @@ watch(() => props.request, (newRequest) => {
 async function setupTelegramListener() {
   try {
     telegramUnlisten = await listen('telegram-event', (event) => {
+      console.log('🎯 [McpPopup] 收到Telegram事件:', event)
+      console.log('🎯 [McpPopup] 事件payload:', event.payload)
       handleTelegramEvent(event.payload as any)
     })
+    console.log('🎯 [McpPopup] Telegram事件监听器已设置')
   }
   catch (error) {
-    console.error('设置Telegram事件监听器失败:', error)
+    console.error('🎯 [McpPopup] 设置Telegram事件监听器失败:', error)
   }
 }
 
 // 处理Telegram事件
 function handleTelegramEvent(event: any) {
+  console.log('🎯 [McpPopup] 开始处理事件:', event.type)
+  
   switch (event.type) {
     case 'option_toggled':
+      console.log('🎯 [McpPopup] 处理选项切换:', event.option)
       handleOptionToggle(event.option)
       break
     case 'text_updated':
+      console.log('🎯 [McpPopup] 处理文本更新:', event.text)
       handleTextUpdate(event.text)
       break
     case 'continue_pressed':
+      console.log('🎯 [McpPopup] 处理继续按钮')
       handleContinue()
       break
     case 'send_pressed':
+      console.log('🎯 [McpPopup] 处理发送按钮')
       handleSubmit()
       break
+    default:
+      console.log('🎯 [McpPopup] 未知事件类型:', event.type)
   }
 }
 
