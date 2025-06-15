@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { McpRequest } from '../../types/popup'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { useMessage } from 'naive-ui'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import PopupActions from './PopupActions.vue'
 import PopupContent from './PopupContent.vue'
@@ -107,6 +108,9 @@ watch(() => props.appConfig.reply, (newReplyConfig) => {
   }
 }, { deep: true, immediate: true })
 
+// Telegram事件监听器
+let telegramUnlisten: (() => void) | null = null
+
 // 监听请求变化
 watch(() => props.request, (newRequest) => {
   if (newRequest) {
@@ -120,9 +124,74 @@ watch(() => props.request, (newRequest) => {
   }
 }, { immediate: true })
 
-// 组件挂载时加载配置
+// 设置Telegram事件监听
+async function setupTelegramListener() {
+  try {
+    telegramUnlisten = await listen('telegram-event', (event) => {
+      handleTelegramEvent(event.payload as any)
+    })
+  }
+  catch (error) {
+    console.error('设置Telegram事件监听器失败:', error)
+  }
+}
+
+// 处理Telegram事件
+function handleTelegramEvent(event: any) {
+  switch (event.type) {
+    case 'option_toggled':
+      handleOptionToggle(event.option)
+      break
+    case 'text_updated':
+      handleTextUpdate(event.text)
+      break
+    case 'continue_pressed':
+      handleContinue()
+      break
+    case 'send_pressed':
+      handleSubmit()
+      break
+  }
+}
+
+// 处理选项切换
+function handleOptionToggle(option: string) {
+  const index = selectedOptions.value.indexOf(option)
+  if (index > -1) {
+    // 取消选择
+    selectedOptions.value.splice(index, 1)
+  } else {
+    // 添加选择
+    selectedOptions.value.push(option)
+  }
+
+  // 同步到PopupInput组件
+  if (inputRef.value) {
+    inputRef.value.updateData({ selectedOptions: selectedOptions.value })
+  }
+}
+
+// 处理文本更新
+function handleTextUpdate(text: string) {
+  userInput.value = text
+
+  // 同步到PopupInput组件
+  if (inputRef.value) {
+    inputRef.value.updateData({ userInput: text })
+  }
+}
+
+// 组件挂载时设置监听器和加载配置
 onMounted(() => {
   loadReplyConfig()
+  setupTelegramListener()
+})
+
+// 组件卸载时清理监听器
+onUnmounted(() => {
+  if (telegramUnlisten) {
+    telegramUnlisten()
+  }
 })
 
 // 重置表单
@@ -194,7 +263,6 @@ function handleInputUpdate(data: { userInput: string, selectedOptions: string[],
 // 处理图片添加 - 移除重复逻辑，避免双重添加
 function handleImageAdd(image: string) {
   // 这个函数现在只是为了保持接口兼容性，实际添加在PopupInput中完成
-  console.log('图片添加事件:', `${image.substring(0, 50)}...`)
 }
 
 // 处理图片移除

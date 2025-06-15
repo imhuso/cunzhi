@@ -132,6 +132,30 @@ async function setupMcpEventListener() {
   }
 }
 
+// 设置Telegram事件监听器
+async function setupTelegramEventListener() {
+  try {
+    await listen('telegram-event', (event) => {
+      console.log('🎯 [App] 收到原始Telegram事件:', event)
+      console.log('🎯 [App] 事件payload:', event.payload)
+      handleTelegramEvent(event.payload)
+    })
+    console.log('🎯 [App] Telegram事件监听器已设置')
+  }
+  catch (error) {
+    console.error('🎯 [App] 设置Telegram事件监听器失败:', error)
+  }
+}
+
+// 处理Telegram事件
+function handleTelegramEvent(event: any) {
+  console.log('🎯 [App] 处理Telegram事件:', event)
+
+  // 这里需要将事件传递给McpPopup组件
+  // 由于我们需要访问弹窗组件的状态，这里先记录事件
+  // 实际的处理逻辑将在McpPopup组件中实现
+}
+
 // 处理消息实例就绪
 function handleMessageReady(message: any) {
   settings.setMessageInstance(message)
@@ -159,6 +183,9 @@ onMounted(async () => {
   if (!isMcp) {
     await setupMcpEventListener()
   }
+
+  // 设置Telegram事件监听器
+  await setupTelegramEventListener()
 
   // 监听系统主题变化
   setupSystemThemeListener()
