@@ -90,7 +90,7 @@ impl TelegramIntegration {
 
         // 启动监听任务
         tokio::spawn(async move {
-            let mut offset = 0;
+            let mut offset = 0i32;
 
             loop {
                 tokio::select! {
@@ -107,8 +107,8 @@ impl TelegramIntegration {
                                 }
 
                                 for update in updates {
-                                    offset = update.id + 1;
-                                    println!("🤖 [Telegram] 处理更新 ID: {}", update.id);
+                                    offset = update.id.0 as i32 + 1;
+                                    println!("🤖 [Telegram] 处理更新 ID: {}", update.id.0);
 
                                     // 处理不同类型的更新
                                     match update.kind {

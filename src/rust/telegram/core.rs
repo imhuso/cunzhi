@@ -104,24 +104,15 @@ impl TelegramCore {
         }
 
         match send_request.await {
-            Ok(msg) => {
-                println!("🤖 [Telegram] ✅ 选项消息发送成功，消息ID: {}", msg.id.0);
-                println!(
-                    "🤖 [Telegram] 消息包含 inline keyboard: {}",
-                    !predefined_options.is_empty()
-                );
-                Ok(())
-            }
+            Ok(_) => Ok(()),
             Err(e) => {
                 let error_str = e.to_string();
-                println!("🤖 [Telegram] ❌ 发送选项消息失败: {}", error_str);
 
                 // 检查是否是JSON解析错误但消息实际发送成功
                 let has_parsing_json = error_str.contains("parsing JSON");
                 let has_ok_true = error_str.contains("\\\"ok\\\":true");
 
                 if has_parsing_json && has_ok_true {
-                    println!("🤖 [Telegram] ⚠️ JSON解析错误但消息可能已发送");
                     // 消息实际发送成功
                     Ok(())
                 } else {
@@ -164,11 +155,6 @@ impl TelegramCore {
         predefined_options: &[String],
         selected_options: &[String],
     ) -> Result<InlineKeyboardMarkup> {
-        println!(
-            "🤖 [Telegram] 创建 inline keyboard，选项数量: {}",
-            predefined_options.len()
-        );
-
         let mut keyboard_rows = Vec::new();
 
         // 添加选项按钮（每行最多2个）
@@ -178,26 +164,17 @@ impl TelegramCore {
                 let callback_data = format!("toggle:{}", option);
                 // 根据选中状态显示按钮
                 let button_text = if selected_options.contains(option) {
-                    format!("☑️ {}", option)
+                    format!("✅ {}", option)
                 } else {
-                    format!("☐ {}", option)
+                    format!("{}", option)
                 };
-                println!(
-                    "🤖 [Telegram] 创建按钮: {} (callback_data: {})",
-                    button_text, callback_data
-                );
+
                 row.push(InlineKeyboardButton::callback(button_text, callback_data));
             }
             keyboard_rows.push(row);
         }
 
-        let rows_count = keyboard_rows.len();
         let keyboard = InlineKeyboardMarkup::new(keyboard_rows);
-        println!(
-            "🤖 [Telegram] ✅ inline keyboard 创建完成，行数: {}",
-            rows_count
-        );
-
         Ok(keyboard)
     }
 
@@ -210,8 +187,8 @@ impl TelegramCore {
         }
 
         KeyboardMarkup::new(vec![keyboard_buttons])
-            .resize_keyboard(true)
-            .one_time_keyboard(false)
+            .resize_keyboard()
+            .one_time_keyboard()
     }
 
     /// 更新inline keyboard中的选项状态
@@ -230,9 +207,8 @@ impl TelegramCore {
             .await
         {
             Ok(_) => Ok(()),
-            Err(e) => {
+            Err(_) => {
                 // 键盘更新失败通常不是致命错误，记录但不中断流程
-                println!("⚠️ [Telegram] 更新键盘失败: {}", e);
                 Ok(())
             }
         }
@@ -247,7 +223,7 @@ pub async fn handle_callback_query(
 ) -> ResponseResult<Option<String>> {
     // 检查是否是目标聊天
     if let Some(message) = &callback_query.message {
-        if message.chat.id != target_chat_id {
+        if message.chat().id != target_chat_id {
             return Ok(None);
         }
     }
