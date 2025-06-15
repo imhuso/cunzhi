@@ -76,7 +76,7 @@ async function saveAndTest() {
     await saveTelegramConfig()
 
     // 然后测试连接
-    const result = await invoke('test_telegram_connection', {
+    const result = await invoke('test_telegram_connection_cmd', {
       botToken: telegramConfig.value.bot_token,
       chatId: telegramConfig.value.chat_id,
     }) as string

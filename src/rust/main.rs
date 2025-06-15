@@ -98,7 +98,6 @@ fn main() -> Result<()> {
             Ok(telegram_config) => {
                 if telegram_config.enabled && telegram_config.hide_frontend_popup {
                     // 纯Telegram模式：不启动GUI，直接处理
-                    println!("🔕 启用纯Telegram模式，不显示GUI界面");
                     if let Err(e) = tokio::runtime::Runtime::new()
                         .unwrap()
                         .block_on(handle_telegram_only_mcp_request(request_file))
@@ -190,8 +189,6 @@ async fn handle_telegram_only_mcp_request(request_file: &str) -> Result<()> {
 
     // 发送操作消息（假设启用继续回复）
     core.send_operation_message(true).await?;
-
-    println!("✅ 消息已发送到Telegram，等待用户响应...");
 
     // 启动简单的消息监听循环
     let mut offset = 0i32;
