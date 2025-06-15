@@ -123,16 +123,11 @@ pub async fn start_telegram_sync(
 
     // 启动消息监听（如果有预定义选项）
     if !predefined_options.is_empty() {
-        println!(
-            "🤖 [Telegram] 启动消息监听，选项数量: {}",
-            predefined_options.len()
-        );
         let bot_token_clone = bot_token.clone();
         let chat_id_clone = chat_id.clone();
         let app_handle_clone = app_handle.clone();
 
         tokio::spawn(async move {
-            println!("🤖 [Telegram] 消息监听任务已启动");
             match start_telegram_listener(
                 bot_token_clone,
                 chat_id_clone,
@@ -141,12 +136,10 @@ pub async fn start_telegram_sync(
             )
             .await
             {
-                Ok(_) => println!("🤖 [Telegram] 消息监听正常结束"),
-                Err(e) => println!("🤖 [Telegram] 消息监听出错: {}", e),
+                Ok(_) => {}
+                Err(e) => eprintln!("Telegram消息监听出错: {}", e),
             }
         });
-    } else {
-        println!("🤖 [Telegram] 没有预定义选项，跳过消息监听启动");
     }
 
     Ok(())

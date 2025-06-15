@@ -43,8 +43,6 @@ impl TelegramIntegration {
         is_markdown: bool,
         continue_reply_enabled: bool,
     ) -> Result<()> {
-        println!("🤖 [Telegram] 开始发送MCP请求消息");
-
         // 初始化选中选项状态
         {
             let mut selected = self.selected_options.lock().await;
@@ -76,8 +74,6 @@ impl TelegramIntegration {
 
     /// 启动消息监听
     async fn start_message_listener(&mut self) -> Result<()> {
-        println!("🤖 [Telegram] 启动消息监听");
-
         let bot = self.core.bot.clone();
         let chat_id = self.core.chat_id;
         let app_handle = self.app_handle.clone();
@@ -95,26 +91,18 @@ impl TelegramIntegration {
             loop {
                 tokio::select! {
                     _ = &mut stop_rx => {
-                        println!("🤖 [Telegram] 收到停止信号，结束监听");
                         break;
                     }
                     _ = tokio::time::sleep(tokio::time::Duration::from_millis(1000)) => {
                         // 轮询获取更新
                         match bot.get_updates().offset(offset).await {
                             Ok(updates) => {
-                                if !updates.is_empty() {
-                                    println!("🤖 [Telegram] 收到 {} 个更新", updates.len());
-                                }
-
                                 for update in updates {
                                     offset = update.id.0 as i32 + 1;
-                                    println!("🤖 [Telegram] 处理更新 ID: {}", update.id.0);
 
                                     // 处理不同类型的更新
                                     match update.kind {
                                         teloxide::types::UpdateKind::CallbackQuery(callback_query) => {
-                                            println!("🤖 [Telegram] 收到 CallbackQuery: {:?}", callback_query.data);
-
                                             // 使用核心模块的处理函数
                                             match handle_callback_query(
                                                 &bot,
@@ -122,7 +110,6 @@ impl TelegramIntegration {
                                                 chat_id,
                                             ).await {
                                                 Ok(Some(option)) => {
-                                                    println!("🤖 [Telegram] 处理选项: {}", option);
 
                                                     // 切换选项状态
                                                     let selected = {
@@ -141,31 +128,25 @@ impl TelegramIntegration {
                                                         option: option.clone(),
                                                         selected,
                                                     };
-                                                    println!("🤖 [Telegram] 发送事件到前端: {:?}", event);
 
-                                                    match app_handle.emit("telegram-event", &event) {
-                                                        Ok(_) => println!("🤖 [Telegram] ✅ 事件发送成功"),
-                                                        Err(e) => println!("🤖 [Telegram] ❌ 事件发送失败: {}", e),
+                                                    if let Err(e) = app_handle.emit("telegram-event", &event) {
+                                                        eprintln!("Telegram事件发送失败: {}", e);
                                                     }
                                                 }
                                                 Ok(None) => {
-                                                    println!("🤖 [Telegram] CallbackQuery 处理返回 None");
+                                                    // CallbackQuery 被过滤或忽略
                                                 }
                                                 Err(e) => {
-                                                    println!("🤖 [Telegram] CallbackQuery 处理失败: {}", e);
+                                                    eprintln!("CallbackQuery处理失败: {}", e);
                                                 }
                                             }
                                         }
-                                                                                teloxide::types::UpdateKind::Message(message) => {
-                                            println!("🤖 [Telegram] 收到消息: {:?} 来自聊天: {}", message.text(), message.chat.id);
-
+                                        teloxide::types::UpdateKind::Message(message) => {
                                             // 获取操作消息ID
                                             let op_msg_id = {
                                                 let op_id = operation_message_id.lock().await;
                                                 *op_id
                                             };
-
-                                            println!("🤖 [Telegram] 操作消息ID: {:?}, 当前消息ID: {}", op_msg_id, message.id.0);
 
                                             // 使用核心模块的处理函数
                                             match handle_text_message(
@@ -174,26 +155,22 @@ impl TelegramIntegration {
                                                 op_msg_id,
                                             ).await {
                                                 Ok(Some(event)) => {
-                                                    println!("🤖 [Telegram] 文本处理成功: {:?}", event);
-
                                                     // 如果是文本更新，保存到用户输入
                                                     if let TelegramEvent::TextUpdated { text } = &event {
                                                         let mut input = user_input.lock().await;
                                                         *input = text.clone();
-                                                        println!("🤖 [Telegram] 保存用户输入: {}", text);
                                                     }
 
                                                     // 发送事件到前端
-                                                    match app_handle.emit("telegram-event", &event) {
-                                                        Ok(_) => println!("🤖 [Telegram] ✅ 文本事件发送成功"),
-                                                        Err(e) => println!("🤖 [Telegram] ❌ 文本事件发送失败: {}", e),
+                                                    if let Err(e) = app_handle.emit("telegram-event", &event) {
+                                                        eprintln!("Telegram文本事件发送失败: {}", e);
                                                     }
                                                 }
                                                 Ok(None) => {
-                                                    println!("🤖 [Telegram] 文本消息被过滤或忽略");
+                                                    // 文本消息被过滤或忽略
                                                 }
                                                 Err(e) => {
-                                                    println!("🤖 [Telegram] 文本消息处理失败: {}", e);
+                                                    eprintln!("文本消息处理失败: {}", e);
                                                 }
                                             }
                                         }
@@ -204,7 +181,7 @@ impl TelegramIntegration {
                                 }
                             }
                             Err(e) => {
-                                println!("🤖 [Telegram] 获取更新失败: {}", e);
+                                eprintln!("Telegram获取更新失败: {}", e);
                                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                             }
                         }
