@@ -7,6 +7,7 @@ use tauri::Manager;
 // 重新导出所有命令函数
 pub use cunzhi::config::mcp_commands::*;
 pub use cunzhi::config::telegram_commands::*;
+pub use cunzhi::telegram::*;
 pub use cunzhi::ui::*;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -54,6 +55,7 @@ pub fn run() {
             get_telegram_config,
             set_telegram_config,
             test_telegram_connection,
+            start_telegram_sync,
             exit_app
         ])
         .setup(|app| {

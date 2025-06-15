@@ -80,7 +80,22 @@ async function showMcpDialog(request: any) {
     await invoke('play_notification_sound')
   }
   catch (error) {
-    console.error('显示MCP弹窗失败:', error)
+    console.error('播放音频通知失败:', error)
+  }
+
+  // 启动Telegram同步
+  try {
+    if (request?.message) {
+      await invoke('start_telegram_sync', {
+        message: request.message,
+        predefinedOptions: request.predefined_options || [],
+        isMarkdown: request.is_markdown || false
+      })
+      console.log('✅ Telegram同步启动成功')
+    }
+  }
+  catch (error) {
+    console.error('启动Telegram同步失败:', error)
   }
 }
 

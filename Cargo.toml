@@ -47,6 +47,7 @@ reqwest = { version = "0.11", features = [ "stream" ] }
 base64 = "0.21"
 rust-embed = "8.0"
 teloxide = { version = "0.12", features = ["macros"] }
+regex = "1.0"
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
