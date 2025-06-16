@@ -214,60 +214,66 @@ async fn handle_telegram_only_mcp_request(request_file: &str) -> Result<()> {
 
                     match update.kind {
                         teloxide::types::UpdateKind::CallbackQuery(callback_query) => {
-                            // 从callback_query中提取消息ID
-                            if let Some(message) = &callback_query.message {
-                                if options_message_id.is_none() {
-                                    options_message_id = Some(message.id().0);
-                                }
-                            }
-
-                            use cunzhi::telegram::handle_callback_query;
-                            if let Ok(Some(option)) =
-                                handle_callback_query(&core.bot, &callback_query, core.chat_id)
-                                    .await
-                            {
-                                // 切换选项状态
-                                if selected_options.contains(&option) {
-                                    selected_options.remove(&option);
-                                } else {
-                                    selected_options.insert(option.clone());
+                            // 只有当有预定义选项时才处理 callback queries
+                            if !predefined_options.is_empty() {
+                                // 从callback_query中提取消息ID
+                                if let Some(message) = &callback_query.message {
+                                    if options_message_id.is_none() {
+                                        options_message_id = Some(message.id().0);
+                                    }
                                 }
 
-                                // 更新按钮状态
-                                if let Some(msg_id) = options_message_id {
-                                    let selected_vec: Vec<String> =
-                                        selected_options.iter().cloned().collect();
-                                    let _ = core
-                                        .update_inline_keyboard(
-                                            msg_id,
-                                            &predefined_options,
-                                            &selected_vec,
-                                        )
-                                        .await;
+                                use cunzhi::telegram::handle_callback_query;
+                                if let Ok(Some(option)) =
+                                    handle_callback_query(&core.bot, &callback_query, core.chat_id)
+                                        .await
+                                {
+                                    // 切换选项状态
+                                    if selected_options.contains(&option) {
+                                        selected_options.remove(&option);
+                                    } else {
+                                        selected_options.insert(option.clone());
+                                    }
+
+                                    // 更新按钮状态
+                                    if let Some(msg_id) = options_message_id {
+                                        let selected_vec: Vec<String> =
+                                            selected_options.iter().cloned().collect();
+                                        let _ = core
+                                            .update_inline_keyboard(
+                                                msg_id,
+                                                &predefined_options,
+                                                &selected_vec,
+                                            )
+                                            .await;
+                                    }
                                 }
                             }
                         }
                         teloxide::types::UpdateKind::Message(message) => {
-                            // 检查是否是包含 inline keyboard 的选项消息
-                            if let Some(inline_keyboard) = message.reply_markup() {
-                                // 检查是否包含我们的选项按钮
-                                let mut contains_our_options = false;
-                                for row in &inline_keyboard.inline_keyboard {
-                                    for button in row {
-                                        if let teloxide::types::InlineKeyboardButtonKind::CallbackData(callback_data) = &button.kind {
-                                            if callback_data.starts_with("toggle:") {
-                                                contains_our_options = true;
-                                                break;
+                            // 只有当有预定义选项时才检查 inline keyboard
+                            if !predefined_options.is_empty() {
+                                // 检查是否是包含 inline keyboard 的选项消息
+                                if let Some(inline_keyboard) = message.reply_markup() {
+                                    // 检查是否包含我们的选项按钮
+                                    let mut contains_our_options = false;
+                                    for row in &inline_keyboard.inline_keyboard {
+                                        for button in row {
+                                            if let teloxide::types::InlineKeyboardButtonKind::CallbackData(callback_data) = &button.kind {
+                                                if callback_data.starts_with("toggle:") {
+                                                    contains_our_options = true;
+                                                    break;
+                                                }
                                             }
                                         }
+                                        if contains_our_options {
+                                            break;
+                                        }
                                     }
-                                    if contains_our_options {
-                                        break;
-                                    }
-                                }
 
-                                if contains_our_options {
-                                    options_message_id = Some(message.id.0);
+                                    if contains_our_options {
+                                        options_message_id = Some(message.id.0);
+                                    }
                                 }
                             }
 

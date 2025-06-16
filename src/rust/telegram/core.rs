@@ -89,14 +89,14 @@ impl TelegramCore {
             message.to_string()
         };
 
-        // 创建inline keyboard
-        let inline_keyboard = Self::create_inline_keyboard(predefined_options, &[])?;
+        // 创建消息发送请求
+        let mut send_request = self.bot.send_message(self.chat_id, processed_message);
 
-        // 发送消息
-        let mut send_request = self
-            .bot
-            .send_message(self.chat_id, processed_message)
-            .reply_markup(inline_keyboard);
+        // 只有当有预定义选项时才添加inline keyboard
+        if !predefined_options.is_empty() {
+            let inline_keyboard = Self::create_inline_keyboard(predefined_options, &[])?;
+            send_request = send_request.reply_markup(inline_keyboard);
+        }
 
         // 如果是Markdown，设置解析模式
         if is_markdown {

@@ -121,31 +121,30 @@ pub async fn start_telegram_sync(
         .await
         .map_err(|e| format!("发送操作消息失败: {}", e))?;
 
-    // 启动消息监听（如果有预定义选项）
-    if !predefined_options.is_empty() {
-        let bot_token_clone = bot_token.clone();
-        let chat_id_clone = chat_id.clone();
-        let app_handle_clone = app_handle.clone();
+    // 启动消息监听（根据是否有预定义选项选择监听模式）
+    let bot_token_clone = bot_token.clone();
+    let chat_id_clone = chat_id.clone();
+    let app_handle_clone = app_handle.clone();
 
-        tokio::spawn(async move {
-            match start_telegram_listener(
-                bot_token_clone,
-                chat_id_clone,
-                app_handle_clone,
-                predefined_options,
-            )
-            .await
-            {
-                Ok(_) => {}
-                Err(e) => eprintln!("Telegram消息监听出错: {}", e),
-            }
-        });
-    }
+    tokio::spawn(async move {
+        // 使用统一的监听器，传递选项参数
+        match start_telegram_listener(
+            bot_token_clone,
+            chat_id_clone,
+            app_handle_clone,
+            predefined_options,
+        )
+        .await
+        {
+            Ok(_) => {}
+            Err(e) => eprintln!("Telegram消息监听出错: {}", e),
+        }
+    });
 
     Ok(())
 }
 
-/// 启动Telegram消息监听（简化版本）
+/// 启动Telegram消息监听（统一版本，支持有选项和无选项模式）
 async fn start_telegram_listener(
     bot_token: String,
     chat_id: String,
@@ -162,6 +161,7 @@ async fn start_telegram_listener(
     let mut options_message_id: Option<i32> = None;
     let mut user_input: String = String::new(); // 存储用户输入的文本
     let predefined_options = predefined_options_list;
+    let has_options = !predefined_options.is_empty(); // 是否有预定义选项
 
     // 获取当前最新的消息ID作为基准
     if let Ok(updates) = core.bot.get_updates().limit(10).await {
@@ -179,74 +179,80 @@ async fn start_telegram_listener(
 
                     match update.kind {
                         teloxide::types::UpdateKind::CallbackQuery(callback_query) => {
-                            // 从callback_query中提取消息ID
-                            if let Some(message) = &callback_query.message {
-                                if options_message_id.is_none() {
-                                    options_message_id = Some(message.id().0);
+                            // 只有当有预定义选项时才处理 callback queries
+                            if has_options {
+                                // 从callback_query中提取消息ID
+                                if let Some(message) = &callback_query.message {
+                                    if options_message_id.is_none() {
+                                        options_message_id = Some(message.id().0);
+                                    }
                                 }
-                            }
 
-                            if let Ok(Some(option)) =
-                                handle_callback_query(&core.bot, &callback_query, core.chat_id)
-                                    .await
-                            {
-                                // 切换选项状态
-                                let selected = if selected_options.contains(&option) {
-                                    selected_options.remove(&option);
-                                    false
-                                } else {
-                                    selected_options.insert(option.clone());
-                                    true
-                                };
-
-                                // 发送事件到前端
-                                use crate::telegram::TelegramEvent;
-                                let event = TelegramEvent::OptionToggled {
-                                    option: option.clone(),
-                                    selected,
-                                };
-
-                                let _ = app_handle.emit("telegram-event", &event);
-
-                                // 更新按钮状态
-                                if let Some(msg_id) = options_message_id {
-                                    let selected_vec: Vec<String> =
-                                        selected_options.iter().cloned().collect();
-                                    match core
-                                        .update_inline_keyboard(
-                                            msg_id,
-                                            &predefined_options,
-                                            &selected_vec,
-                                        )
+                                if let Ok(Some(option)) =
+                                    handle_callback_query(&core.bot, &callback_query, core.chat_id)
                                         .await
-                                    {
-                                        Ok(_) => {}
-                                        Err(_) => {}
+                                {
+                                    // 切换选项状态
+                                    let selected = if selected_options.contains(&option) {
+                                        selected_options.remove(&option);
+                                        false
+                                    } else {
+                                        selected_options.insert(option.clone());
+                                        true
+                                    };
+
+                                    // 发送事件到前端
+                                    use crate::telegram::TelegramEvent;
+                                    let event = TelegramEvent::OptionToggled {
+                                        option: option.clone(),
+                                        selected,
+                                    };
+
+                                    let _ = app_handle.emit("telegram-event", &event);
+
+                                    // 更新按钮状态
+                                    if let Some(msg_id) = options_message_id {
+                                        let selected_vec: Vec<String> =
+                                            selected_options.iter().cloned().collect();
+                                        match core
+                                            .update_inline_keyboard(
+                                                msg_id,
+                                                &predefined_options,
+                                                &selected_vec,
+                                            )
+                                            .await
+                                        {
+                                            Ok(_) => {}
+                                            Err(_) => {}
+                                        }
                                     }
                                 }
                             }
                         }
                         teloxide::types::UpdateKind::Message(message) => {
-                            // 检查是否是包含 inline keyboard 的选项消息
-                            if let Some(inline_keyboard) = message.reply_markup() {
-                                // 检查是否包含我们的选项按钮
-                                let mut contains_our_options = false;
-                                for row in &inline_keyboard.inline_keyboard {
-                                    for button in row {
-                                        if let teloxide::types::InlineKeyboardButtonKind::CallbackData(callback_data) = &button.kind {
-                                            if callback_data.starts_with("toggle:") {
-                                                contains_our_options = true;
-                                                break;
+                            // 只有当有预定义选项时才检查 inline keyboard
+                            if has_options {
+                                // 检查是否是包含 inline keyboard 的选项消息
+                                if let Some(inline_keyboard) = message.reply_markup() {
+                                    // 检查是否包含我们的选项按钮
+                                    let mut contains_our_options = false;
+                                    for row in &inline_keyboard.inline_keyboard {
+                                        for button in row {
+                                            if let teloxide::types::InlineKeyboardButtonKind::CallbackData(callback_data) = &button.kind {
+                                                if callback_data.starts_with("toggle:") {
+                                                    contains_our_options = true;
+                                                    break;
+                                                }
                                             }
                                         }
+                                        if contains_our_options {
+                                            break;
+                                        }
                                     }
-                                    if contains_our_options {
-                                        break;
-                                    }
-                                }
 
-                                if contains_our_options {
-                                    options_message_id = Some(message.id.0);
+                                    if contains_our_options {
+                                        options_message_id = Some(message.id.0);
+                                    }
                                 }
                             }
 
