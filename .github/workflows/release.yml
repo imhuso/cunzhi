@@ -19,7 +19,7 @@ jobs:
           - platform: macos-latest
             args: --target x86_64-apple-darwin
             name: macos-x86_64
-          - platform: ubuntu-20.04
+          - platform: ubuntu-22.04
             args: ''
             name: linux-x86_64
           - platform: windows-latest
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies (Linux)
-        if: startsWith(matrix.platform, 'ubuntu-')
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -85,6 +85,8 @@ jobs:
           elif [[ "${{ matrix.platform }}" == "windows-latest" ]]; then
             cargo tauri build --no-bundle
           else
+            # Linux build with improved compatibility
+            export RUSTFLAGS="-C target-feature=+crt-static"
             cargo tauri build --no-bundle
           fi
 
