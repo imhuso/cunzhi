@@ -2,7 +2,6 @@ use anyhow::Result;
 use chrono::Utc;
 use std::fs;
 use std::path::{Path, PathBuf};
-use percent_encoding;
 
 use super::types::{MemoryEntry, MemoryCategory, MemoryMetadata};
 
@@ -40,9 +39,11 @@ impl MemoryManager {
 
     /// 规范化项目路径
     fn normalize_project_path(project_path: &str) -> Result<PathBuf> {
-        // 先对路径进行 URL 解码，处理 Windows 下的编码问题
-        let decoded_path = Self::decode_path(project_path);
-        let path = Path::new(&decoded_path);
+        // 使用增强的路径解码和规范化功能
+        let normalized_path_str = crate::mcp::utils::decode_and_normalize_path(project_path)
+            .map_err(|e| anyhow::anyhow!("路径格式错误: {}", e))?;
+
+        let path = Path::new(&normalized_path_str);
 
         // 转换为绝对路径
         let absolute_path = if path.is_absolute() {
@@ -53,11 +54,19 @@ impl MemoryManager {
 
         // 规范化路径（解析 . 和 .. 等）
         let canonical_path = absolute_path.canonicalize()
-            .unwrap_or(absolute_path);
+            .unwrap_or_else(|_| {
+                // 如果 canonicalize 失败，尝试手动规范化
+                Self::manual_canonicalize(&absolute_path).unwrap_or(absolute_path)
+            });
 
         // 验证路径是否存在且为目录
         if !canonical_path.exists() {
-            return Err(anyhow::anyhow!("项目路径不存在: {}", canonical_path.display()));
+            return Err(anyhow::anyhow!(
+                "项目路径不存在: {}\n原始输入: {}\n规范化后: {}",
+                canonical_path.display(),
+                project_path,
+                normalized_path_str
+            ));
         }
 
         if !canonical_path.is_dir() {
@@ -76,18 +85,35 @@ impl MemoryManager {
         }
     }
 
-    /// 解码 URL 编码的路径
+    /// 手动规范化路径
     ///
-    /// 在 Windows 下，路径中的冒号可能会被编码为 %3A，需要先解码
-    fn decode_path(path: &str) -> String {
-        // 使用 percent_encoding 库进行 URL 解码
-        match percent_encoding::percent_decode_str(path).decode_utf8() {
-            Ok(decoded) => decoded.to_string(),
-            Err(_) => {
-                // 如果解码失败，返回原始路径
-                path.to_string()
+    /// 当 canonicalize 失败时的备用方案
+    fn manual_canonicalize(path: &Path) -> Result<PathBuf> {
+        let mut components = Vec::new();
+
+        for component in path.components() {
+            match component {
+                std::path::Component::CurDir => {
+                    // 忽略 "." 组件
+                }
+                std::path::Component::ParentDir => {
+                    // 处理 ".." 组件
+                    if !components.is_empty() {
+                        components.pop();
+                    }
+                }
+                _ => {
+                    components.push(component);
+                }
             }
         }
+
+        let mut result = PathBuf::new();
+        for component in components {
+            result.push(component);
+        }
+
+        Ok(result)
     }
 
     /// 查找 git 根目录

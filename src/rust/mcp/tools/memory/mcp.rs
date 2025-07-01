@@ -14,9 +14,13 @@ impl MemoryTool {
     pub async fn jiyi(
         request: JiyiRequest,
     ) -> Result<CallToolResult, McpError> {
-        // 检查项目路径是否存在
+        // 使用增强的路径验证功能
         if let Err(e) = validate_project_path(&request.project_path) {
-            return Err(project_path_error(e.to_string()).into());
+            return Err(project_path_error(format!(
+                "路径验证失败: {}\n原始路径: {}\n请检查路径格式是否正确，特别是 Windows 路径应使用正确的盘符格式（如 C:\\path）",
+                e,
+                request.project_path
+            )).into());
         }
 
         let manager = MemoryManager::new(&request.project_path)
