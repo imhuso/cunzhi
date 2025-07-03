@@ -56,6 +56,7 @@ onMounted(async () => {
               @stop-audio="handlers.onStopAudio" @test-audio-error="handlers.onTestAudioError"
               @update-window-size="handlers.onUpdateWindowSize"
               @update-reply-config="handlers.onUpdateReplyConfig" @message-ready="handlers.onMessageReady"
+              @config-reloaded="handlers.onConfigReloaded"
             />
           </n-dialog-provider>
         </n-notification-provider>

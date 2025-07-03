@@ -1,0 +1,357 @@
+/* Driver.js 自定义样式 - 适配寸止应用主题 */
+
+/* 覆盖层样式 - 浅色模式保持透明 */
+.driver-overlay {
+  background-color: transparent !important;
+  cursor: pointer !important;
+}
+
+/* 深色模式下的覆盖层 - 使用灰色半透明遮罩突出引导区域 */
+html[data-theme="dark"] .driver-overlay,
+html.dark .driver-overlay {
+  background-color: rgba(128, 128, 128, 0.5) !important;
+}
+
+/* hover 状态 */
+.driver-overlay:hover {
+  background-color: transparent !important;
+}
+
+html[data-theme="dark"] .driver-overlay:hover,
+html.dark .driver-overlay:hover {
+  background-color: rgba(128, 128, 128, 0.3) !important;
+}
+
+/* 弹出框容器 */
+.driver-popover {
+  background: var(--surface-color, #ffffff) !important;
+  border: 1px solid var(--border-color, #e5e7eb) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  max-width: 320px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  z-index: 10001 !important;
+}
+
+/* 深色模式适配 */
+html[data-theme="dark"] .driver-popover,
+html.dark .driver-popover {
+  background: #2a2a2a !important;
+  border-color: #404040 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 弹出框标题 */
+.driver-popover-title {
+  color: var(--text-color, #1f2937) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  margin-bottom: 8px !important;
+  line-height: 1.4 !important;
+}
+
+/* 深色模式下的标题 */
+html[data-theme="dark"] .driver-popover-title,
+html.dark .driver-popover-title {
+  color: #f9fafb !important;
+}
+
+/* 弹出框描述 */
+.driver-popover-description {
+  color: var(--text-color-secondary, #6b7280) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  margin-bottom: 16px !important;
+}
+
+/* 深色模式下的描述 */
+html[data-theme="dark"] .driver-popover-description,
+html.dark .driver-popover-description {
+  color: #e5e7eb !important;
+}
+
+/* 弹出框箭头 */
+.driver-popover-arrow {
+  border-color: var(--surface-color, #ffffff) !important;
+  z-index: 10002 !important;
+  width: 10px !important;
+  height: 10px !important;
+  display: block !important;
+  position: absolute !important;
+}
+
+/* 修复箭头显示问题 - 根据方向设置正确的边框颜色 */
+.driver-popover-arrow-side-top {
+  border-bottom-color: var(--surface-color, #ffffff) !important;
+  border-top-color: transparent !important;
+  border-left-color: transparent !important;
+  border-right-color: transparent !important;
+}
+
+.driver-popover-arrow-side-bottom {
+  border-top-color: var(--surface-color, #ffffff) !important;
+  border-bottom-color: transparent !important;
+  border-left-color: transparent !important;
+  border-right-color: transparent !important;
+}
+
+.driver-popover-arrow-side-left {
+  border-right-color: var(--surface-color, #ffffff) !important;
+  border-left-color: transparent !important;
+  border-top-color: transparent !important;
+  border-bottom-color: transparent !important;
+}
+
+.driver-popover-arrow-side-right {
+  border-left-color: var(--surface-color, #ffffff) !important;
+  border-right-color: transparent !important;
+  border-top-color: transparent !important;
+  border-bottom-color: transparent !important;
+}
+
+html[data-theme="dark"] .driver-popover-arrow,
+html.dark .driver-popover-arrow {
+  border-color: #2a2a2a !important;
+}
+
+/* 深色模式下的箭头方向样式 */
+html[data-theme="dark"] .driver-popover-arrow-side-top,
+html.dark .driver-popover-arrow-side-top {
+  border-bottom-color: #2a2a2a !important;
+  border-top-color: transparent !important;
+  border-left-color: transparent !important;
+  border-right-color: transparent !important;
+}
+
+html[data-theme="dark"] .driver-popover-arrow-side-bottom,
+html.dark .driver-popover-arrow-side-bottom {
+  border-top-color: #2a2a2a !important;
+  border-bottom-color: transparent !important;
+  border-left-color: transparent !important;
+  border-right-color: transparent !important;
+}
+
+html[data-theme="dark"] .driver-popover-arrow-side-left,
+html.dark .driver-popover-arrow-side-left {
+  border-right-color: #2a2a2a !important;
+  border-left-color: transparent !important;
+  border-top-color: transparent !important;
+  border-bottom-color: transparent !important;
+}
+
+html[data-theme="dark"] .driver-popover-arrow-side-right,
+html.dark .driver-popover-arrow-side-right {
+  border-left-color: #2a2a2a !important;
+  border-right-color: transparent !important;
+  border-top-color: transparent !important;
+  border-bottom-color: transparent !important;
+}
+
+/* 弹出框底部区域 */
+.driver-popover-footer {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-top: 16px !important;
+}
+
+/* 进度指示器 */
+.driver-popover-progress-text {
+  color: var(--text-color-secondary, #6b7280) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+/* 深色模式下的进度指示器 */
+html[data-theme="dark"] .driver-popover-progress-text,
+html.dark .driver-popover-progress-text {
+  color: #9ca3af !important;
+}
+
+/* 按钮容器 */
+.driver-popover-navigation-btns {
+  display: flex !important;
+  gap: 8px !important;
+}
+
+/* 按钮基础样式 */
+.driver-popover-btn {
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  outline: none !important;
+}
+
+/* 主要按钮（下一步） */
+.driver-popover-next-btn {
+  background: var(--primary-color, #3b82f6) !important;
+  color: white !important;
+}
+
+.driver-popover-next-btn:hover {
+  background: var(--primary-color-hover, #2563eb) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* 次要按钮（上一步） */
+.driver-popover-prev-btn {
+  background: var(--surface-secondary, #f3f4f6) !important;
+  color: var(--text-color, #1f2937) !important;
+  border: 1px solid var(--border-color, #e5e7eb) !important;
+}
+
+html[data-theme="dark"] .driver-popover-prev-btn,
+html.dark .driver-popover-prev-btn {
+  background: #2a2a2a !important;
+  border-color: #404040 !important;
+  color: #f9fafb !important;
+}
+
+.driver-popover-prev-btn:hover {
+  background: var(--surface-hover, #e5e7eb) !important;
+  transform: translateY(-1px) !important;
+}
+
+html[data-theme="dark"] .driver-popover-prev-btn:hover,
+html.dark .driver-popover-prev-btn:hover {
+  background: #333 !important;
+  color: #ffffff !important;
+}
+
+/* 关闭按钮 */
+.driver-popover-close-btn {
+  background: transparent !important;
+  color: var(--text-color-secondary, #6b7280) !important;
+  padding: 4px !important;
+  border-radius: 4px !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  position: absolute !important;
+  top: 12px !important;
+  right: 12px !important;
+}
+
+/* 深色模式下的关闭按钮 */
+html[data-theme="dark"] .driver-popover-close-btn,
+html.dark .driver-popover-close-btn {
+  color: #d1d5db !important;
+}
+
+.driver-popover-close-btn:hover {
+  background: var(--surface-hover, #f3f4f6) !important;
+  color: var(--text-color, #1f2937) !important;
+}
+
+html[data-theme="dark"] .driver-popover-close-btn:hover,
+html.dark .driver-popover-close-btn:hover {
+  background: #333 !important;
+  color: #f9fafb !important;
+}
+
+/* 高亮元素样式 - 增强边框效果 */
+.driver-highlighted-element {
+  border-radius: 8px !important;
+  box-shadow:
+    0 0 0 3px #ffffff,
+    0 0 0 6px var(--primary-color, #3b82f6),
+    0 0 30px rgba(59, 130, 246, 0.6),
+    0 0 0 1px rgba(59, 130, 246, 0.2) inset !important;
+  transition: all 0.3s ease !important;
+  position: relative !important;
+  z-index: 10000 !important;
+}
+
+/* 深色模式下的高亮元素 */
+html[data-theme="dark"] .driver-highlighted-element,
+html.dark .driver-highlighted-element {
+  box-shadow:
+    0 0 0 4px #ffffff,
+    0 0 0 8px #60a5fa,
+    0 0 40px rgba(96, 165, 250, 0.8),
+    0 0 0 2px rgba(255, 255, 255, 0.9) inset !important;
+}
+
+/* 确保高亮元素在覆盖层之上 */
+.driver-highlighted-element::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  border-radius: 12px;
+  background: transparent;
+  z-index: -1;
+}
+
+/* 禁用状态 */
+.driver-popover-btn:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 640px) {
+  .driver-popover {
+    max-width: 280px !important;
+    margin: 16px !important;
+  }
+  
+  .driver-popover-title {
+    font-size: 15px !important;
+  }
+  
+  .driver-popover-description {
+    font-size: 13px !important;
+  }
+  
+  .driver-popover-btn {
+    padding: 6px 12px !important;
+    font-size: 13px !important;
+  }
+}
+
+/* 动画效果 */
+.driver-popover {
+  animation: driverFadeIn 0.3s ease-out !important;
+}
+
+@keyframes driverFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* 自定义主题变量 */
+:root {
+  --driver-primary-color: #3b82f6;
+  --driver-primary-hover: #2563eb;
+  --driver-surface-color: #ffffff;
+  --driver-surface-secondary: #f3f4f6;
+  --driver-surface-hover: #e5e7eb;
+  --driver-text-color: #1f2937;
+  --driver-text-secondary: #6b7280;
+  --driver-border-color: #e5e7eb;
+}
+
+html[data-theme="dark"],
+html.dark {
+  --driver-primary-color: #60a5fa;
+  --driver-primary-hover: #3b82f6;
+  --driver-surface-color: #2a2a2a;
+  --driver-surface-secondary: #333333;
+  --driver-surface-hover: #404040;
+  --driver-text-color: #f9fafb;
+  --driver-text-secondary: #d1d5db;
+  --driver-border-color: #404040;
+}

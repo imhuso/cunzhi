@@ -47,6 +47,7 @@ interface Emits {
   updateWindowSize: [size: { width: number, height: number, fixed: boolean }]
   updateReplyConfig: [config: { enable_continue_reply?: boolean, continue_prompt?: string }]
   messageReady: [message: any]
+  configReloaded: []
 }
 
 const props = defineProps<Props>()
@@ -237,6 +238,7 @@ onUnmounted(() => {
       @stop-audio="$emit('stopAudio')"
       @test-audio-error="$emit('testAudioError', $event)"
       @update-window-size="$emit('updateWindowSize', $event)"
+      @config-reloaded="$emit('configReloaded')"
     />
 
     <!-- 更新弹窗 -->

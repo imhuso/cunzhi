@@ -10,6 +10,43 @@ const props = withDefaults(defineProps<Props>(), {
   currentTheme: 'dark',
 })
 
+const emit = defineEmits<Emits>()
+
+// 预处理引用内容，移除增强prompt格式标记
+function preprocessQuoteContent(content: string): string {
+  let processedContent = content
+
+  // 定义需要移除的格式标记
+  const markersToRemove = [
+    /### BEGIN RESPONSE ###\s*/gi,
+    /Here is an enhanced version of the original instruction that is more specific and clear:\s*/gi,
+    /<augment-enhanced-prompt>\s*/gi,
+    /<\/augment-enhanced-prompt>\s*/gi,
+    /### END RESPONSE ###\s*/gi,
+  ]
+
+  // 逐个移除格式标记
+  markersToRemove.forEach((marker) => {
+    processedContent = processedContent.replace(marker, '')
+  })
+
+  // 清理多余的空行和首尾空白
+  processedContent = processedContent
+    .replace(/\n\s*\n\s*\n/g, '\n\n') // 将多个连续空行合并为两个
+    .trim() // 移除首尾空白
+
+  return processedContent
+}
+
+// 引用消息内容
+function quoteMessage() {
+  if (props.request?.message) {
+    // 预处理内容，移除增强prompt格式标记
+    const processedContent = preprocessQuoteContent(props.request.message)
+    emit('quoteMessage', processedContent)
+  }
+}
+
 // 动态导入代码高亮样式，根据主题切换
 
 // 动态加载代码高亮样式
@@ -35,6 +72,10 @@ interface Props {
   request: McpRequest | null
   loading?: boolean
   currentTheme?: string
+}
+
+interface Emits {
+  quoteMessage: [message: string]
 }
 
 const message = useMessage()
@@ -278,7 +319,7 @@ onUpdated(() => {
     </div>
 
     <!-- 消息显示区域 -->
-    <div v-else-if="request?.message">
+    <div v-else-if="request?.message" class="relative">
       <!-- 主要内容 -->
       <div
         v-if="request.is_markdown"
@@ -296,6 +337,18 @@ onUpdated(() => {
       />
       <div v-else class="whitespace-pre-wrap leading-relaxed text-white">
         {{ request.message }}
+      </div>
+
+      <!-- 引用原文按钮 - 位于右下角 -->
+      <div class="flex justify-end mt-4 pt-3 border-t border-gray-600/30" data-guide="quote-message">
+        <div
+          title="点击将AI的消息内容引用到输入框中"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-500/20 hover:bg-blue-500/30 text-white rounded-md transition-all duration-200 cursor-pointer border border-blue-500/50 hover:border-blue-500/70 shadow-sm hover:shadow-md"
+          @click="quoteMessage"
+        >
+          <div class="i-carbon-quotes w-3.5 h-3.5" />
+          <span>引用原文</span>
+        </div>
       </div>
     </div>
 

@@ -7,7 +7,7 @@ use tauri::{AppHandle, Manager};
 /// 应用设置和初始化
 pub async fn setup_application(app_handle: &AppHandle) -> Result<(), String> {
     let state = app_handle.state::<AppState>();
-    
+
     // 加载配置并应用窗口设置
     if let Err(e) = load_config_and_apply_window_settings(&state, app_handle).await {
         log_important!(warn, "加载配置失败: {}", e);

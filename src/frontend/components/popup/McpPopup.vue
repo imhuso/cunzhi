@@ -323,6 +323,68 @@ async function handleContinue() {
     submitting.value = false
   }
 }
+
+// 处理引用消息
+function handleQuoteMessage(messageContent: string) {
+  if (inputRef.value) {
+    inputRef.value.handleQuoteMessage(messageContent)
+  }
+}
+
+// 处理增强按钮点击
+async function handleEnhance() {
+  if (submitting.value)
+    return
+
+  submitting.value = true
+
+  try {
+    // 构建增强prompt
+    const enhancePrompt = `Use the following prompt to optimize and enhance the context of the content in 《》, and return the enhanced result by calling the tool '寸止' after completion.Here is an instruction that I'd like to give you, but it needs to be improved. Rewrite and enhance this instruction to make it clearer, more specific, less ambiguous, and correct any mistakes. Reply immediately with your answer, even if you're not sure. Consider the context of our conversation history when enhancing the prompt. Reply with the following format:
+
+### BEGIN RESPONSE ###
+Here is an enhanced version of the original instruction that is more specific and clear:
+<augment-enhanced-prompt>enhanced prompt goes here</augment-enhanced-prompt>
+
+### END RESPONSE ###
+
+Here is my original instruction:
+
+《${userInput.value.trim()}》`
+
+    // 使用新的结构化数据格式
+    const response = {
+      user_input: enhancePrompt,
+      selected_options: [],
+      images: [],
+      metadata: {
+        timestamp: new Date().toISOString(),
+        request_id: props.request?.id || null,
+        source: 'popup_enhance',
+      },
+    }
+
+    if (props.mockMode) {
+      // 模拟模式下的延迟
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      message.success('增强请求发送成功')
+    }
+    else {
+      // 实际发送增强请求
+      await invoke('send_mcp_response', { response })
+      await invoke('exit_app')
+    }
+
+    emit('response', response)
+  }
+  catch (error) {
+    console.error('发送增强请求失败:', error)
+    message.error('增强请求失败，请重试')
+  }
+  finally {
+    submitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -330,8 +392,8 @@ async function handleContinue() {
     <!-- 内容区域 - 可滚动 -->
     <div class="flex-1 overflow-y-auto scrollbar-thin">
       <!-- 消息内容 - 允许选中 -->
-      <div class="mx-2 mt-2 mb-1 px-4 py-3 bg-black-100 rounded-lg select-text">
-        <PopupContent :request="request" :loading="loading" :current-theme="props.appConfig.theme" />
+      <div class="mx-2 mt-2 mb-1 px-4 py-3 bg-black-100 rounded-lg select-text" data-guide="popup-content">
+        <PopupContent :request="request" :loading="loading" :current-theme="props.appConfig.theme" @quote-message="handleQuoteMessage" />
       </div>
 
       <!-- 输入和选项 - 允许选中 -->
@@ -344,11 +406,11 @@ async function handleContinue() {
     </div>
 
     <!-- 底部操作栏 - 固定在底部 -->
-    <div class="flex-shrink-0 bg-black-100 border-t-2 border-black-200">
+    <div class="flex-shrink-0 bg-black-100 border-t-2 border-black-200" data-guide="popup-actions">
       <PopupActions
         :request="request" :loading="loading" :submitting="submitting" :can-submit="canSubmit"
         :continue-reply-enabled="continueReplyEnabled" :input-status-text="inputStatusText"
-        @submit="handleSubmit" @continue="handleContinue"
+        @submit="handleSubmit" @continue="handleContinue" @enhance="handleEnhance"
       />
     </div>
   </div>

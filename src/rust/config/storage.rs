@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, LogicalSize, Manager, State};
 
-use super::settings::{AppConfig, AppState};
+use super::settings::{AppConfig, AppState, default_shortcuts};
 
 pub fn get_config_path(_app: &AppHandle) -> Result<PathBuf> {
     // 使用与独立配置相同的路径，确保一致性
@@ -24,7 +24,15 @@ pub async fn save_config(state: &State<'_, AppState>, app: &AppHandle) -> Result
         .map_err(|e| anyhow::anyhow!("获取配置失败: {}", e))?;
     let config_json = serde_json::to_string_pretty(&*config)?;
 
-    fs::write(config_path, config_json)?;
+    // 写入文件
+    fs::write(&config_path, config_json)?;
+
+    // 强制刷新文件系统缓存
+    if let Ok(file) = std::fs::OpenOptions::new().write(true).open(&config_path) {
+        let _ = file.sync_all();
+    }
+
+    println!("配置已保存到: {:?}", config_path);
 
     Ok(())
 }
@@ -35,7 +43,10 @@ pub async fn load_config(state: &State<'_, AppState>, app: &AppHandle) -> Result
 
     if config_path.exists() {
         let config_json = fs::read_to_string(config_path)?;
-        let config: AppConfig = serde_json::from_str(&config_json)?;
+        let mut config: AppConfig = serde_json::from_str(&config_json)?;
+
+        // 合并默认快捷键配置，确保新的默认快捷键被添加
+        merge_default_shortcuts(&mut config);
 
         let mut config_guard = state
             .config
@@ -114,7 +125,11 @@ pub fn load_standalone_config() -> Result<AppConfig> {
 
     if config_path.exists() {
         let config_json = fs::read_to_string(config_path)?;
-        let config: AppConfig = serde_json::from_str(&config_json)?;
+        let mut config: AppConfig = serde_json::from_str(&config_json)?;
+
+        // 合并默认快捷键配置
+        merge_default_shortcuts(&mut config);
+
         Ok(config)
     } else {
         // 如果配置文件不存在，返回默认配置
@@ -139,4 +154,30 @@ fn get_standalone_config_path() -> Result<PathBuf> {
     fs::create_dir_all(&config_dir)?;
 
     Ok(config_dir.join("config.json"))
+}
+
+/// 合并默认快捷键配置，确保新的默认快捷键被添加到现有配置中
+fn merge_default_shortcuts(config: &mut AppConfig) {
+    let default_shortcuts = default_shortcuts();
+
+    // 遍历所有默认快捷键
+    for (key, default_binding) in default_shortcuts {
+        if !config.shortcut_config.shortcuts.contains_key(&key) {
+            // 如果用户配置中不存在，则添加
+            config.shortcut_config.shortcuts.insert(key, default_binding);
+        } else if key == "enhance" {
+            // 特殊处理：更新增强快捷键的默认值从 Ctrl+Shift+Enter 到 Shift+Enter
+            let existing_binding = config.shortcut_config.shortcuts.get(&key).unwrap();
+
+            // 检查是否是旧的默认值 (Ctrl+Shift+Enter)
+            if existing_binding.key_combination.key == "Enter"
+                && existing_binding.key_combination.ctrl
+                && existing_binding.key_combination.shift
+                && !existing_binding.key_combination.alt
+                && !existing_binding.key_combination.meta {
+                // 更新为新的默认值 (Shift+Enter)
+                config.shortcut_config.shortcuts.insert(key, default_binding);
+            }
+        }
+    }
 }
