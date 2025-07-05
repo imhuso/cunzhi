@@ -134,18 +134,42 @@ export function useSettings() {
 
   // 从后端同步窗口状态（用于MCP弹窗启动时确保状态一致）
   async function syncWindowStateFromBackend() {
-    try {
-      // 重新获取后端的置顶状态
-      const backendAlwaysOnTop = await invoke('get_always_on_top')
-      alwaysOnTop.value = backendAlwaysOnTop as boolean
+    const maxRetries = 3
+    let retryCount = 0
 
-      // 同步窗口状态到前端
-      await invoke('sync_window_state')
+    while (retryCount < maxRetries) {
+      try {
+        console.log(`尝试同步窗口状态 (第${retryCount + 1}次)`)
 
-      console.log('窗口状态已从后端同步:', { alwaysOnTop: alwaysOnTop.value })
-    }
-    catch (error) {
-      console.error('同步窗口状态失败:', error)
+        // 重新获取后端的置顶状态
+        const backendAlwaysOnTop = await invoke('get_always_on_top')
+        const previousValue = alwaysOnTop.value
+        alwaysOnTop.value = backendAlwaysOnTop as boolean
+
+        // 同步窗口状态到前端
+        await invoke('sync_window_state')
+
+        console.log('窗口状态已从后端同步:', {
+          previous: previousValue,
+          current: alwaysOnTop.value,
+          backend: backendAlwaysOnTop,
+          retry: retryCount + 1
+        })
+
+        // 成功则退出循环
+        break
+      }
+      catch (error) {
+        retryCount++
+        console.error(`同步窗口状态失败 (第${retryCount}次):`, error)
+
+        if (retryCount < maxRetries) {
+          // 等待一段时间后重试
+          await new Promise(resolve => setTimeout(resolve, 100 * retryCount))
+        } else {
+          console.error('窗口状态同步最终失败，已达到最大重试次数')
+        }
+      }
     }
   }
 
