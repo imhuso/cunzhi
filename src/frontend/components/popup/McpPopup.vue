@@ -222,9 +222,12 @@ async function handleSubmit() {
   submitting.value = true
 
   try {
+    // 获取包含条件性内容的最终用户输入
+    const finalUserInput = inputRef.value?.getFinalUserInput() || userInput.value
+
     // 使用新的结构化数据格式
     const response = {
-      user_input: userInput.value.trim() || null,
+      user_input: finalUserInput.trim() || null,
       selected_options: selectedOptions.value,
       images: draggedImages.value.map(imageData => ({
         data: imageData.split(',')[1], // 移除 data:image/png;base64, 前缀

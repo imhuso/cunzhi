@@ -143,16 +143,10 @@ const statusText = computed(() => {
   return '等待输入...'
 })
 
-// 发送更新事件
+// 发送更新事件（不包含条件性内容，避免重复追加）
 function emitUpdate() {
-  // 获取条件性prompt的追加内容
-  const conditionalContent = generateConditionalContent()
-
-  // 将条件性内容追加到用户输入
-  const finalUserInput = userInput.value + conditionalContent
-
   emit('update', {
-    userInput: finalUserInput,
+    userInput: userInput.value,
     selectedOptions: selectedOptions.value,
     draggedImages: uploadedImages.value,
   })
@@ -560,6 +554,12 @@ function updateData(data: { userInput?: string, selectedOptions?: string[], drag
 
 // 移除了文件选择和测试图片功能
 
+// 获取包含条件性内容的最终用户输入
+function getFinalUserInput(): string {
+  const conditionalContent = generateConditionalContent()
+  return userInput.value + conditionalContent
+}
+
 // 暴露方法给父组件
 defineExpose({
   reset,
@@ -567,6 +567,7 @@ defineExpose({
   statusText,
   updateData,
   handleQuoteMessage,
+  getFinalUserInput,
 })
 </script>
 
