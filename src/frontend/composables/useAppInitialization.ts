@@ -56,6 +56,11 @@ export function useAppInitialization(mcpHandler: ReturnType<typeof import('./use
       await settings.loadWindowSettings()
       await settings.loadWindowConfig()
 
+      // 在MCP模式下，确保前端状态与后端窗口状态同步
+      if (isMcp) {
+        await settings.syncWindowStateFromBackend()
+      }
+
       // 初始化MCP工具配置（在非MCP模式下）
       if (!isMcp) {
         await initMcpTools()
