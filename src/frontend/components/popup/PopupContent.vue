@@ -340,7 +340,7 @@ onUpdated(() => {
       </div>
 
       <!-- 引用原文按钮 - 位于右下角 -->
-      <div class="flex justify-end mt-4 pt-3 border-t border-gray-600/30" data-guide="quote-message">
+      <div class="flex justify-end mt-4 pt-3 border-t border-gray-600/30">
         <div
           title="点击将AI的消息内容引用到输入框中"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-500/20 hover:bg-blue-500/30 text-white rounded-md transition-all duration-200 cursor-pointer border border-blue-500/50 hover:border-blue-500/70 shadow-sm hover:shadow-md"

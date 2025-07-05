@@ -97,7 +97,7 @@ function testPopup() {
         <!-- 标题区域 -->
         <div class="text-center mb-8">
           <!-- 主标题 -->
-          <div class="flex items-center justify-center gap-3 mb-3" data-guide="app-logo">
+          <div class="flex items-center justify-center gap-3 mb-3">
             <img
               src="/icons/icon-128.png"
               alt="寸止 Logo"
@@ -114,7 +114,7 @@ function testPopup() {
               circle
               title="测试 Popup 功能"
               class="ml-2"
-              data-guide="test-button"
+
               @click="showTestMcpPopup"
             >
               <template #icon>
@@ -140,7 +140,7 @@ function testPopup() {
         </div>
 
         <!-- Tab组件 -->
-        <n-tabs v-model:value="activeTab" type="segment" size="small" justify-content="center" data-guide="tabs">
+        <n-tabs v-model:value="activeTab" type="segment" size="small" justify-content="center">
           <n-tab-pane name="intro" tab="介绍">
             <IntroTab />
           </n-tab-pane>
@@ -150,7 +150,7 @@ function testPopup() {
           <n-tab-pane name="prompts" tab="参考提示词">
             <PromptsTab />
           </n-tab-pane>
-          <n-tab-pane name="settings" tab="设置" data-guide="settings-tab">
+          <n-tab-pane name="settings" tab="设置">
             <SettingsTab
               :current-theme="currentTheme"
               :always-on-top="alwaysOnTop"

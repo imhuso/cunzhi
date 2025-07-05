@@ -573,7 +573,7 @@ defineExpose({
 <template>
   <div class="space-y-3">
     <!-- 预定义选项 -->
-    <div v-if="!loading && hasOptions" class="space-y-3" data-guide="predefined-options">
+    <div v-if="!loading && hasOptions" class="space-y-3">
       <h4 class="text-sm font-medium text-white">
         请选择选项
       </h4>
@@ -650,7 +650,7 @@ defineExpose({
       </h4>
 
       <!-- 自定义prompt按钮区域 -->
-      <div v-if="customPromptEnabled && customPrompts.length > 0" class="space-y-2" data-guide="custom-prompts">
+      <div v-if="customPromptEnabled && customPrompts.length > 0" class="space-y-2">
         <div class="text-xs text-on-surface-secondary flex items-center gap-2">
           <div class="i-carbon-bookmark w-3 h-3 text-primary-500" />
           <span>快捷模板 (拖拽调整顺序):</span>
@@ -683,7 +683,7 @@ defineExpose({
       </div>
 
       <!-- 上下文追加区域 -->
-      <div v-if="customPromptEnabled && conditionalPrompts.length > 0" class="space-y-2" data-guide="context-append">
+      <div v-if="customPromptEnabled && conditionalPrompts.length > 0" class="space-y-2">
         <div class="text-xs text-on-surface-secondary flex items-center gap-2">
           <div class="i-carbon-settings-adjust w-3 h-3 text-primary-500" />
           <span>上下文追加:</span>
@@ -727,7 +727,7 @@ defineExpose({
         :placeholder="hasOptions ? `您可以在这里添加补充说明... (支持粘贴图片 ${pasteShortcut})` : `请输入您的回复... (支持粘贴图片 ${pasteShortcut})`"
         :disabled="submitting"
         :autosize="{ minRows: 3, maxRows: 6 }"
-        data-guide="popup-input"
+
         @paste="handleImagePaste"
       />
     </div>

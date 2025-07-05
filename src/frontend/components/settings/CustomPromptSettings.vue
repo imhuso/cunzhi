@@ -234,7 +234,7 @@ onMounted(() => {
       />
     </div>
 
-    <div v-if="config.enabled" data-guide="custom-prompt-settings">
+    <div v-if="config.enabled">
       <!-- 添加按钮 -->
       <div class="flex justify-between items-center mb-4">
         <div class="text-sm opacity-60">
@@ -244,7 +244,7 @@ onMounted(() => {
           type="primary"
           size="small"
           :disabled="config.prompts.length >= config.maxPrompts"
-          data-guide="add-prompt-button"
+
           @click="showAddDialog = true"
         >
           <template #icon>

@@ -67,7 +67,6 @@ function createUser(data: Partial<User>): User {
 ## 建议的改进
 
 \`\`\`typescript
-import { v4 as uuidv4 } from 'uuid'
 
 interface User {
   id: string

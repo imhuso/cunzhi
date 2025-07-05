@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import { useUserGuide } from '../../composables/useUserGuide'
 import ThemeIcon from '../common/ThemeIcon.vue'
-
-// 导入引导样式
-import '../../assets/styles/driver-custom.css'
 
 interface Props {
   currentTheme?: string
@@ -27,8 +23,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>()
 
-// 使用引导功能
-const { startGuide, guideFlows, isGuideActive } = useUserGuide()
+
 
 function handleThemeChange() {
   // 切换到下一个主题
@@ -44,20 +39,7 @@ function handleToggleAlwaysOnTop() {
   emit('toggleAlwaysOnTop')
 }
 
-// 启动弹窗功能引导
-async function handleStartGuide() {
-  try {
-    const steps = guideFlows.popupGuide()
-    await startGuide(steps, {
-      onDestroyed: () => {
-        console.log('弹窗引导完成')
-      },
-    })
-  }
-  catch (error) {
-    console.error('启动弹窗引导失败:', error)
-  }
-}
+
 </script>
 
 <template>
@@ -73,20 +55,6 @@ async function handleStartGuide() {
 
       <!-- 右侧：操作按钮 -->
       <n-space size="small">
-        <!-- 引导按钮 -->
-        <n-button
-          size="small"
-          quaternary
-          circle
-          title="开启弹窗功能引导"
-          :disabled="isGuideActive"
-          @click="handleStartGuide"
-        >
-          <template #icon>
-            <div class="i-carbon-help w-4 h-4 text-white" />
-          </template>
-        </n-button>
-
         <!-- 置顶按钮 -->
         <n-button
           size="small"

@@ -392,7 +392,7 @@ Here is my original instruction:
     <!-- 内容区域 - 可滚动 -->
     <div class="flex-1 overflow-y-auto scrollbar-thin">
       <!-- 消息内容 - 允许选中 -->
-      <div class="mx-2 mt-2 mb-1 px-4 py-3 bg-black-100 rounded-lg select-text" data-guide="popup-content">
+      <div class="mx-2 mt-2 mb-1 px-4 py-3 bg-black-100 rounded-lg select-text">
         <PopupContent :request="request" :loading="loading" :current-theme="props.appConfig.theme" @quote-message="handleQuoteMessage" />
       </div>
 
@@ -406,7 +406,7 @@ Here is my original instruction:
     </div>
 
     <!-- 底部操作栏 - 固定在底部 -->
-    <div class="flex-shrink-0 bg-black-100 border-t-2 border-black-200" data-guide="popup-actions">
+    <div class="flex-shrink-0 bg-black-100 border-t-2 border-black-200">
       <PopupActions
         :request="request" :loading="loading" :submitting="submitting" :can-submit="canSubmit"
         :continue-reply-enabled="continueReplyEnabled" :input-status-text="inputStatusText"

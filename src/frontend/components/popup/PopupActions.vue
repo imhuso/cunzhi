@@ -118,7 +118,7 @@ onMounted(() => {
       </div>
 
       <!-- 右侧操作按钮 -->
-      <div class="flex items-center" data-guide="popup-actions">
+      <div class="flex items-center">
         <n-space size="small">
           <!-- 增强按钮 -->
           <n-tooltip trigger="hover" placement="top">
@@ -127,7 +127,7 @@ onMounted(() => {
                 :disabled="!canSubmit || submitting"
                 size="medium"
                 type="info"
-                data-guide="enhance-button"
+
                 @click="handleEnhance"
               >
                 <template #icon>
@@ -147,7 +147,7 @@ onMounted(() => {
                 :loading="submitting"
                 size="medium"
                 type="default"
-                data-guide="continue-button"
+
                 @click="handleContinue"
               >
                 <template #icon>
@@ -167,7 +167,7 @@ onMounted(() => {
                 :disabled="!canSubmit || submitting"
                 :loading="submitting"
                 size="medium"
-                data-guide="submit-button"
+
                 @click="handleSubmit"
               >
                 <template #icon>
