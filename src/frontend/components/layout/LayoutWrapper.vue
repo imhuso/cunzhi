@@ -32,6 +32,7 @@ interface Emits {
   stopAudio: []
   testAudioError: [error: any]
   updateWindowSize: [size: { width: number, height: number, fixed: boolean }]
+  configReloaded: []
 }
 
 defineProps<Props>()
@@ -55,5 +56,6 @@ defineEmits<Emits>()
     @stop-audio="$emit('stopAudio')"
     @test-audio-error="$emit('testAudioError', $event)"
     @update-window-size="$emit('updateWindowSize', $event)"
+    @config-reloaded="$emit('configReloaded')"
   />
 </template>

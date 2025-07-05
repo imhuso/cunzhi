@@ -3,7 +3,7 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { ref } from 'vue'
 
 export function useSettings() {
-  const alwaysOnTop = ref(true)
+  const alwaysOnTop = ref(true) // 与后端默认值保持一致
   const audioNotificationEnabled = ref(true)
   const audioUrl = ref('')
   const windowConfig = ref({
@@ -349,6 +349,19 @@ export function useSettings() {
     }
   }
 
+  // 重新加载所有设置
+  async function reloadAllSettings() {
+    try {
+      console.log('重新加载所有设置...')
+      await loadWindowSettings()
+      await loadWindowConfig()
+      console.log('所有设置重新加载完成')
+    }
+    catch (error) {
+      console.error('重新加载设置失败:', error)
+    }
+  }
+
   return {
     // 状态
     alwaysOnTop,
@@ -377,5 +390,6 @@ export function useSettings() {
     loadWindowConfig,
     setupWindowResizeListener,
     removeWindowResizeListener,
+    reloadAllSettings,
   }
 }

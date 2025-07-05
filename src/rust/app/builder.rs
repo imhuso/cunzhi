@@ -69,6 +69,24 @@ pub fn build_tauri_app() -> Builder<tauri::Wry> {
             select_image_files,
             build_mcp_send_response,
             build_mcp_continue_response,
+            create_test_popup,
+
+            // 自定义prompt命令
+            get_custom_prompt_config,
+            add_custom_prompt,
+            update_custom_prompt,
+            delete_custom_prompt,
+            set_custom_prompt_enabled,
+            update_custom_prompt_order,
+            update_conditional_prompt_state,
+
+            // 快捷键命令
+            get_shortcut_config,
+            update_shortcut_binding,
+            reset_shortcuts_to_default,
+
+            // 配置管理命令
+            get_config_file_path,
 
             // Telegram 命令
             get_telegram_config,

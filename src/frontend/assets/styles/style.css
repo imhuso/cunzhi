@@ -1,3 +1,6 @@
+/* Driver.js 自定义样式导入 */
+@import './driver-custom.css';
+
 /* 语义化 CSS 变量 - 由主题系统动态设置 */
 :root {
   /* 默认使用深色主题的值，避免初始化闪烁 */

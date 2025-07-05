@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { McpRequest } from '../../types/popup'
-import { useMagicKeys } from '@vueuse/core'
-import { computed, watch } from 'vue'
-import { useKeyboard } from '../../composables/useKeyboard'
+import { computed, onMounted } from 'vue'
+import { useShortcuts } from '../../composables/useShortcuts'
 
 interface Props {
   request: McpRequest | null
@@ -17,6 +16,7 @@ interface Props {
 interface Emits {
   submit: []
   continue: []
+  enhance: []
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -30,17 +30,18 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>()
 
-// 跨平台快捷键支持
-const keys = useMagicKeys()
-const ctrlEnter = keys['Ctrl+Enter']
-const metaEnter = keys['Meta+Enter']
+// 使用自定义快捷键系统
+const {
+  quickSubmitShortcutText,
+  enhanceShortcutText,
+  continueShortcutText,
+  useQuickSubmitShortcut,
+  useEnhanceShortcut,
+  useContinueShortcut,
+  loadShortcutConfig,
+} = useShortcuts()
 
-// 使用统一的键盘处理
-const { isMac } = useKeyboard()
-
-const shortcutText = computed(() => {
-  return isMac.value ? '⌘+回车 快速发送' : 'Ctrl+回车 快速发送'
-})
+const shortcutText = quickSubmitShortcutText
 
 const statusText = computed(() => {
   // 如果可以提交，直接显示快捷键提示
@@ -61,9 +62,21 @@ const statusText = computed(() => {
 })
 
 // 处理快捷键
-watch([ctrlEnter, metaEnter], ([ctrlPressed, metaPressed]) => {
-  if ((ctrlPressed || metaPressed) && props.canSubmit && !props.submitting) {
+useQuickSubmitShortcut(() => {
+  if (props.canSubmit && !props.submitting) {
     handleSubmit()
+  }
+})
+
+useEnhanceShortcut(() => {
+  if (!props.submitting) {
+    handleEnhance()
+  }
+})
+
+useContinueShortcut(() => {
+  if (!props.submitting) {
+    handleContinue()
   }
 })
 
@@ -78,6 +91,17 @@ function handleContinue() {
     emit('continue')
   }
 }
+
+function handleEnhance() {
+  if (!props.submitting) {
+    emit('enhance')
+  }
+}
+
+// 组件挂载时加载快捷键配置
+onMounted(() => {
+  loadShortcutConfig()
+})
 </script>
 
 <template>
@@ -94,36 +118,66 @@ function handleContinue() {
       </div>
 
       <!-- 右侧操作按钮 -->
-      <div class="flex items-center">
+      <div class="flex items-center" data-guide="popup-actions">
         <n-space size="small">
-          <!-- 继续按钮 -->
-          <n-button
-            v-if="continueReplyEnabled"
-            :disabled="submitting"
-            :loading="submitting"
-            size="medium"
-            type="default"
-            @click="handleContinue"
-          >
-            <template #icon>
-              <div class="i-carbon-play w-4 h-4" />
+          <!-- 增强按钮 -->
+          <n-tooltip trigger="hover" placement="top">
+            <template #trigger>
+              <n-button
+                :disabled="!canSubmit || submitting"
+                size="medium"
+                type="info"
+                data-guide="enhance-button"
+                @click="handleEnhance"
+              >
+                <template #icon>
+                  <div class="i-carbon-magic-wand w-4 h-4" />
+                </template>
+                增强
+              </n-button>
             </template>
-            继续
-          </n-button>
+            {{ enhanceShortcutText }}
+          </n-tooltip>
+
+          <!-- 继续按钮 -->
+          <n-tooltip v-if="continueReplyEnabled" trigger="hover" placement="top">
+            <template #trigger>
+              <n-button
+                :disabled="submitting"
+                :loading="submitting"
+                size="medium"
+                type="default"
+                data-guide="continue-button"
+                @click="handleContinue"
+              >
+                <template #icon>
+                  <div class="i-carbon-play w-4 h-4" />
+                </template>
+                继续
+              </n-button>
+            </template>
+            {{ continueShortcutText }}
+          </n-tooltip>
 
           <!-- 发送按钮 -->
-          <n-button
-            type="primary"
-            :disabled="!canSubmit || submitting"
-            :loading="submitting"
-            size="medium"
-            @click="handleSubmit"
-          >
-            <template #icon>
-              <div v-if="!submitting" class="i-carbon-send w-4 h-4" />
+          <n-tooltip trigger="hover" placement="top">
+            <template #trigger>
+              <n-button
+                type="primary"
+                :disabled="!canSubmit || submitting"
+                :loading="submitting"
+                size="medium"
+                data-guide="submit-button"
+                @click="handleSubmit"
+              >
+                <template #icon>
+                  <div v-if="!submitting" class="i-carbon-send w-4 h-4" />
+                </template>
+                {{ submitting ? '发送中...' : '发送' }}
+              </n-button>
             </template>
-            {{ submitting ? '发送中...' : '发送' }}
-          </n-button>
+            {{ shortcutText }}
+          </n-tooltip>
         </n-space>
       </div>
     </div>

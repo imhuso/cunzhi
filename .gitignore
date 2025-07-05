@@ -57,6 +57,9 @@ test_client.py
 # Memory files (user-specific)
 .cunzhi-memory/
 
+# Configuration files (user-specific)
+config.json
+
 # Archive files
 *.zip
 *.dmg
@@ -71,3 +74,5 @@ src-tauri/Cargo.lock
 
 # scripts
 scripts/
+*.exe
+*.md

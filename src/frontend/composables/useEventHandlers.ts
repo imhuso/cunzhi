@@ -23,5 +23,8 @@ export function useEventHandlers(actions: any) {
 
     // 音频事件
     onTestAudioError: actions.audio.handleTestError,
+
+    // 配置事件
+    onConfigReloaded: actions.settings.reloadAllSettings,
   }
 }

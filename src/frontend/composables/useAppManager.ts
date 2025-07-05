@@ -52,6 +52,7 @@ export function useAppManager() {
       updateWindowSize: settings.updateWindowSize,
       updateReplyConfig: settings.updateReplyConfig,
       setMessageInstance: settings.setMessageInstance,
+      reloadAllSettings: settings.reloadAllSettings,
     },
     // MCP操作
     mcp: {
