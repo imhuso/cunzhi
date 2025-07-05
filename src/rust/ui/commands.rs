@@ -42,6 +42,8 @@ pub async fn set_always_on_top(
         window
             .set_always_on_top(enabled)
             .map_err(|e| format!("设置窗口置顶失败: {}", e))?;
+
+        log::info!("用户切换窗口置顶状态为: {} (已保存配置)", enabled);
     }
 
     Ok(())

@@ -132,6 +132,23 @@ export function useSettings() {
     }
   }
 
+  // 从后端同步窗口状态（用于MCP弹窗启动时确保状态一致）
+  async function syncWindowStateFromBackend() {
+    try {
+      // 重新获取后端的置顶状态
+      const backendAlwaysOnTop = await invoke('get_always_on_top')
+      alwaysOnTop.value = backendAlwaysOnTop as boolean
+
+      // 同步窗口状态到前端
+      await invoke('sync_window_state')
+
+      console.log('窗口状态已从后端同步:', { alwaysOnTop: alwaysOnTop.value })
+    }
+    catch (error) {
+      console.error('同步窗口状态失败:', error)
+    }
+  }
+
   // 切换音频通知设置
   async function toggleAudioNotification() {
     try {
@@ -381,6 +398,7 @@ export function useSettings() {
     loadWindowSettings,
     loadWindowConstraints,
     toggleAlwaysOnTop,
+    syncWindowStateFromBackend,
     toggleAudioNotification,
     updateAudioUrl,
     testAudioSound,

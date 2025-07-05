@@ -23,8 +23,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>()
 
-
-
 function handleThemeChange() {
   // 切换到下一个主题
   const nextTheme = props.currentTheme === 'light' ? 'dark' : 'light'
@@ -38,8 +36,6 @@ function handleOpenMainLayout() {
 function handleToggleAlwaysOnTop() {
   emit('toggleAlwaysOnTop')
 }
-
-
 </script>
 
 <template>

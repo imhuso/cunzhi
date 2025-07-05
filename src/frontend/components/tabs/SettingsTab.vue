@@ -133,8 +133,6 @@ function handleWindowSizeUpdate(size: { width: number, height: number, fixed: bo
         </div>
       </n-collapse-item>
 
-
-
       <!-- 字体设置 -->
       <n-collapse-item name="font">
         <template #header>

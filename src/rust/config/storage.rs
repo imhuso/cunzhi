@@ -83,7 +83,7 @@ pub async fn load_config_and_apply_window_settings(
         if let Err(e) = window.set_always_on_top(always_on_top) {
             log::warn!("设置窗口置顶失败: {}", e);
         } else {
-            log::debug!("窗口置顶状态已设置为: {}", always_on_top);
+            log::info!("窗口置顶状态已设置为: {} (配置加载时)", always_on_top);
         }
 
         // 应用窗口大小约束
