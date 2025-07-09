@@ -39,6 +39,13 @@ pub async fn set_always_on_top(
 
     // 应用到当前窗口
     if let Some(window) = app.get_webview_window("main") {
+        let pid = std::process::id();
+        log::info!(
+            "Process ID: {}, Window Label: '{}', Setting always_on_top to: {}",
+            pid,
+            window.label(),
+            enabled
+        );
         window
             .set_always_on_top(enabled)
             .map_err(|e| format!("设置窗口置顶失败: {}", e))?;
