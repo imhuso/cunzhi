@@ -2,7 +2,10 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { ref } from 'vue'
 
-export function useSettings() {
+// 单例实例
+let settingsInstance: ReturnType<typeof createSettings> | null = null
+
+function createSettings() {
   const alwaysOnTop = ref(true) // 与后端默认值保持一致
   const audioNotificationEnabled = ref(true)
   const audioUrl = ref('')
@@ -145,7 +148,7 @@ export function useSettings() {
       await invoke('sync_window_state')
 
       console.log('窗口状态已从后端同步:', {
-        alwaysOnTop: alwaysOnTop.value
+        alwaysOnTop: alwaysOnTop.value,
       })
     }
     catch (error) {
@@ -374,13 +377,43 @@ export function useSettings() {
   // 重新加载所有设置
   async function reloadAllSettings() {
     try {
-      console.log('重新加载所有设置...')
+      // 首先重新加载后端配置文件到内存
+      await invoke('reload_config')
+
+      // 然后重新加载前端设置
       await loadWindowSettings()
       await loadWindowConfig()
-      console.log('所有设置重新加载完成')
     }
     catch (error) {
       console.error('重新加载设置失败:', error)
+    }
+  }
+
+  // 窗口焦点监听器
+  let windowFocusUnlisten: (() => void) | null = null
+
+  // 设置窗口焦点监听
+  async function setupWindowFocusListener() {
+    try {
+      const webview = getCurrentWebviewWindow()
+
+      // 监听窗口获得焦点事件
+      windowFocusUnlisten = await webview.onFocusChanged(({ payload: focused }) => {
+        if (focused) {
+          reloadAllSettings()
+        }
+      })
+    }
+    catch (error) {
+      console.error('设置窗口焦点监听器失败:', error)
+    }
+  }
+
+  // 移除窗口焦点监听器
+  function removeWindowFocusListener() {
+    if (windowFocusUnlisten) {
+      windowFocusUnlisten()
+      windowFocusUnlisten = null
     }
   }
 
@@ -414,5 +447,14 @@ export function useSettings() {
     setupWindowResizeListener,
     removeWindowResizeListener,
     reloadAllSettings,
+    setupWindowFocusListener,
+    removeWindowFocusListener,
   }
+}
+
+export function useSettings() {
+  if (!settingsInstance) {
+    settingsInstance = createSettings()
+  }
+  return settingsInstance
 }

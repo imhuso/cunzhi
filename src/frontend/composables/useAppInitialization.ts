@@ -56,12 +56,16 @@ export function useAppInitialization(mcpHandler: ReturnType<typeof import('./use
       await settings.loadWindowSettings()
       await settings.loadWindowConfig()
 
+      // 设置窗口焦点监听器，用于配置同步
+      await settings.setupWindowFocusListener()
+
       // 在MCP模式下，确保前端状态与后端窗口状态同步
       if (isMcp) {
         console.log('MCP模式检测到，同步窗口状态...')
         try {
           await settings.syncWindowStateFromBackend()
-        } catch (error) {
+        }
+        catch (error) {
           console.warn('MCP模式状态同步失败，继续初始化:', error)
         }
       }

@@ -42,7 +42,7 @@ pub async fn load_config(state: &State<'_, AppState>, app: &AppHandle) -> Result
     let config_path = get_config_path(app)?;
 
     if config_path.exists() {
-        let config_json = fs::read_to_string(config_path)?;
+        let config_json = fs::read_to_string(&config_path)?;
         let mut config: AppConfig = serde_json::from_str(&config_json)?;
 
         // 合并默认快捷键配置，确保新的默认快捷键被添加

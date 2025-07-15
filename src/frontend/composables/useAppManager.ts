@@ -18,23 +18,27 @@ export function useAppManager() {
   const appInit = useAppInitialization(mcpHandler)
 
   // 创建统一的配置对象
-  const appConfig = computed(() => ({
-    theme: theme.currentTheme.value,
-    window: {
-      alwaysOnTop: settings.alwaysOnTop.value,
-      width: settings.windowWidth.value,
-      height: settings.windowHeight.value,
-      fixed: settings.fixedWindowSize.value,
-    },
-    audio: {
-      enabled: settings.audioNotificationEnabled.value,
-      url: settings.audioUrl.value,
-    },
-    reply: {
-      enabled: settings.continueReplyEnabled.value,
-      prompt: settings.continuePrompt.value,
-    },
-  }))
+  const appConfig = computed(() => {
+    const config = {
+      theme: theme.currentTheme.value,
+      window: {
+        alwaysOnTop: settings.alwaysOnTop.value,
+        width: settings.windowWidth.value,
+        height: settings.windowHeight.value,
+        fixed: settings.fixedWindowSize.value,
+      },
+      audio: {
+        enabled: settings.audioNotificationEnabled.value,
+        url: settings.audioUrl.value,
+      },
+      reply: {
+        enabled: settings.continueReplyEnabled.value,
+        prompt: settings.continuePrompt.value,
+      },
+    }
+
+    return config
+  })
 
   // 创建统一的操作对象
   const actions = {
@@ -66,6 +70,10 @@ export function useAppManager() {
     // 应用操作
     app: {
       initialize: appInit.initializeApp,
+      cleanup: () => {
+        // 清理窗口焦点监听器
+        settings.removeWindowFocusListener()
+      },
     },
   }
 

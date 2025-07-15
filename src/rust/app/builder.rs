@@ -22,6 +22,7 @@ pub fn build_tauri_app() -> Builder<tauri::Wry> {
             get_always_on_top,
             set_always_on_top,
             sync_window_state,
+            reload_config,
 
             // 音频命令
             get_audio_notification_enabled,

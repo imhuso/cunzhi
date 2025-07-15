@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, watchEffect } from 'vue'
+import { onMounted, onUnmounted, watchEffect } from 'vue'
 import AppContent from './components/AppContent.vue'
 import { useAppManager } from './composables/useAppManager'
 import { useEventHandlers } from './composables/useEventHandlers'
@@ -38,6 +38,11 @@ onMounted(async () => {
   catch (error) {
     console.error('应用初始化失败:', error)
   }
+})
+
+// 清理
+onUnmounted(() => {
+  actions.app.cleanup()
 })
 </script>
 

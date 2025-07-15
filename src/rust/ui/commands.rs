@@ -1,4 +1,4 @@
-use crate::config::{save_config, AppState, ReplyConfig, WindowConfig, CustomPrompt, CustomPromptConfig, ShortcutConfig, ShortcutBinding};
+use crate::config::{save_config, load_config, AppState, ReplyConfig, WindowConfig, CustomPrompt, CustomPromptConfig, ShortcutConfig, ShortcutBinding};
 use crate::constants::{window, ui, validation};
 use crate::mcp::types::{build_continue_response, build_send_response, ImageAttachment, PopupRequest};
 use crate::mcp::handlers::create_tauri_popup;
@@ -69,6 +69,20 @@ pub async fn sync_window_state(
             .set_always_on_top(always_on_top)
             .map_err(|e| format!("同步窗口状态失败: {}", e))?;
     }
+
+    Ok(())
+}
+
+/// 重新加载配置文件到内存
+#[tauri::command]
+pub async fn reload_config(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    // 从文件重新加载配置到内存
+    load_config(&state, &app)
+        .await
+        .map_err(|e| format!("重新加载配置失败: {}", e))?;
 
     Ok(())
 }

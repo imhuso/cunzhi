@@ -37,6 +37,7 @@ const currentHeight = ref(0)
 let windowResizeUnlisten: (() => void) | null = null
 
 // 监听props变化，同步本地值
+
 watch(() => props.windowWidth, (newWidth) => {
   localWidth.value = newWidth
 })

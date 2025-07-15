@@ -36,8 +36,6 @@ function handleOpenMainLayout() {
 function handleToggleAlwaysOnTop() {
   emit('toggleAlwaysOnTop')
 }
-
-
 </script>
 
 <template>
