@@ -137,4 +137,5 @@ export function applyThemeVariables(themeName: string) {
   // 强制设置主题类 - 确保根节点类名正确
   root.classList.remove('light', 'dark')
   root.classList.add(effectiveTheme)
+  root.setAttribute('data-theme', effectiveTheme)
 }

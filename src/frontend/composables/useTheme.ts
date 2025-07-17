@@ -3,15 +3,14 @@ import { computed, ref } from 'vue'
 import { applyThemeVariables, getTheme } from '../theme'
 
 export function useTheme() {
-  // 使用默认深色主题，等待后端加载
-  const currentTheme = ref('dark')
-
-  // 立即应用默认主题，避免初始化闪烁
-  applyThemeVariables('dark')
+  // 不设置默认主题，等待从config.json加载
+  const currentTheme = ref('')
 
   // 计算 Naive UI 主题
   const naiveTheme = computed(() => {
-    return getTheme(currentTheme.value)
+    // 如果主题还未加载，使用默认深色主题
+    const theme = currentTheme.value || 'dark'
+    return getTheme(theme)
   })
 
   // 应用主题
@@ -47,10 +46,16 @@ export function useTheme() {
     }
     catch (error) {
       console.error('加载主题失败:', error)
-      // 加载失败时保持默认深色主题
+      // 加载失败时使用默认深色主题
       applyTheme('dark')
     }
   }
+
+  // 立即尝试加载主题，避免延迟
+  loadTheme().catch(() => {
+    // 如果加载失败，应用默认主题
+    applyTheme('dark')
+  })
 
   return {
     currentTheme,

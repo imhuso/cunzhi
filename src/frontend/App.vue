@@ -17,18 +17,7 @@ const {
 // 创建事件处理器
 const handlers = useEventHandlers(actions)
 
-// 监听主题变化，确保根节点类名正确（但不干扰主题应用）
-watchEffect(() => {
-  const root = document.documentElement
-  const theme = appConfig.value.theme
-
-  // 只更新类名，不触发主题重新应用
-  if (theme) {
-    root.classList.remove('light', 'dark')
-    root.classList.add(theme === 'light' ? 'light' : 'dark')
-    root.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark')
-  }
-})
+// 主题应用由useTheme统一管理，移除重复的主题应用逻辑
 
 // 初始化
 onMounted(async () => {
