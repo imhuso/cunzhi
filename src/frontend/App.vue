@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, watchEffect } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import AppContent from './components/AppContent.vue'
 import { useAppManager } from './composables/useAppManager'
 import { useEventHandlers } from './composables/useEventHandlers'
