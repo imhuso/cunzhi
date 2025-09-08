@@ -120,3 +120,137 @@ pnpm tauri:dev
 MIT License - 自由使用，欢迎贡献！
 
 </div>
+
+---
+# English
+
+# Cunzhi 🛑
+
+> **The "Premature Ending" Terminator for AI Conversations — Keep the Dialogue Going**
+
+Still frustrated by your AI assistant ending the conversation too early? You clearly have more to discuss, but it says, “Is there anything else I can help you with?” **Cunzhi** is here to fix that problem!
+
+When the AI tries to “wrap things up,” Cunzhi will instantly pop up a dialogue box, allowing you to continue the conversation until the issue is truly resolved.
+
+## 🌟 Key Features
+
+* 🛑 **Smart Interception**: Automatically pops up options to continue when the AI tries to end the chat
+* 🧠 **Memory Management**: Stores development standards and preferences by project
+* 🎨 **Elegant Interaction**: Markdown support and multiple input methods
+* ⚡ **Instant Setup**: 3-second installation, cross-platform support
+
+## 📸 See It in Action
+
+### 🛑 Smart Interception Popup
+
+![Cunzhi popup demo](./screenshots/popup_en.png)
+
+*When the AI tries to end the conversation, Cunzhi's smart popup appears just in time, offering predefined options for quick selection to keep the discussion going*
+
+### ⚙️ Settings Management Interface
+
+![Cunzhi settings interface](./screenshots/settings_en.png)
+
+*Elegant settings interface supporting memory management, feature toggles, theme switching, and smart prompt generation*
+
+## 🚀 Get Started
+
+### Method 1: Quick Install (Recommended)
+
+**macOS Users:**
+
+```bash
+# 3-second install, no compile time needed
+brew tap imhuso/cunzhi && brew install cunzhi
+```
+
+> ⚠️ **Troubleshooting**: If you encounter a 404 download error, please follow these steps:
+>
+> ```bash
+> # Clear the old tap cache
+> brew untap imhuso/cunzhi
+> # Reinstall
+> brew tap imhuso/cunzhi && brew install cunzhi
+> ```
+>
+> **Example of common error:**
+>
+> ```
+> curl: (56) The requested URL returned error: 404
+> Error: cunzhi: Failed to download resource "cunzhi"
+> Download failed: https://github.com/imhuso/cunzhi/releases/download/v0.2.0/cunzhi-cli-v0.2.4-macos-aarch64.tar.gz
+> ```
+>
+> This is usually caused by version mismatch due to cached data from previous installs. Clearing the tap and reinstalling should resolve it.
+
+**Windows/Linux Users:**
+We recommend using Method 2 for manual download — simple and quick!
+
+### Method 2: Manual Download
+
+1. Visit the [Releases Page](https://github.com/imhuso/cunzhi/releases)
+
+2. Download the version suitable for your system:
+
+   * 🐧 **Linux**: `cunzhi-cli-v*-linux-x86_64.tar.gz`
+   * 🍎 **macOS (Intel)**: `cunzhi-cli-v*-macos-x86_64.tar.gz`
+   * 🍎 **macOS (Apple Silicon)**: `cunzhi-cli-v*-macos-aarch64.tar.gz`
+   * 🪟 **Windows**: `cunzhi-cli-v*-windows-x86_64.zip`
+
+3. After extracting, add both `Cunzhi` and `Dengyixia` to your system PATH
+
+## ⚡ Quick Start
+
+### Step 1: Configure Your MCP Client
+
+In the config file of your MCP client (e.g., Claude Desktop), add:
+
+```json
+{
+  "mcpServers": {
+    "Cunzhi": {
+      "command": "Cunzhi"
+    }
+  }
+}
+```
+
+### Step 2: Open the Settings Interface
+
+```bash
+# Run the settings command
+Dengyixia
+```
+
+### Step 3: Configure Prompts
+
+In the “Reference Prompts” tab of the settings interface:
+
+1. View the auto-generated prompts
+2. Click the copy button
+3. Add the prompts to your AI assistant
+
+### Step 4: Start Using
+
+Your AI assistant now has smart interception, memory management, and popup interaction capabilities!
+
+> 💡 **Tip**: You can personalize the generated prompts to create your own tailored AI interaction experience.
+
+## 🤝 Contribute
+
+Cunzhi is an open-source project, and we welcome all forms of contributions!
+
+### 🛠️ Local Development
+
+```bash
+git clone https://github.com/imhuso/cunzhi.git
+cd cunzhi
+pnpm install
+pnpm tauri:dev
+```
+
+## 📄 License
+
+MIT License – Free to use, contributions welcome!
+
+---
