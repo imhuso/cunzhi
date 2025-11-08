@@ -38,14 +38,18 @@ pub fn init_logger(config: LogConfig) -> Result<(), Box<dyn std::error::Error>> 
         
         // 设置日志格式
         builder.format(|buf, record| {
-            writeln!(
-                buf,
+            let log_line = format!(
                 "{} [{}] [{}] {}",
                 chrono::Utc::now().format("%Y-%m-%d %H:%M:%S%.3f"),
                 record.level(),
                 record.module_path().unwrap_or("unknown"),
                 record.args()
-            )
+            );
+            
+            // 写入到原始目标（stderr 或文件）
+            writeln!(buf, "{}", log_line)?;
+            
+            Ok(())
         });
         
         // 根据模式设置输出目标
@@ -67,8 +71,39 @@ pub fn init_logger(config: LogConfig) -> Result<(), Box<dyn std::error::Error>> 
                 builder.filter_level(LevelFilter::Off);
             }
         } else {
-            // 非 MCP 模式：输出到 stderr
-            builder.target(Target::Stderr);
+            // 非 MCP 模式：如果指定了文件路径，同时输出到文件和 stderr
+            if let Some(file_path) = &config.file_path {
+                // 尝试打开文件，如果成功则同时输出到文件和 stderr
+                if let Ok(log_file) = OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(file_path) 
+                {
+                    // 使用自定义目标，同时写入文件和 stderr
+                    use std::io::Write;
+                    struct DualWriter {
+                        file: std::fs::File,
+                    }
+                    impl Write for DualWriter {
+                        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                            let written = self.file.write(buf)?;
+                            let _ = std::io::stderr().write_all(buf);
+                            Ok(written)
+                        }
+                        fn flush(&mut self) -> std::io::Result<()> {
+                            self.file.flush()?;
+                            std::io::stderr().flush()
+                        }
+                    }
+                    builder.target(Target::Pipe(Box::new(DualWriter { file: log_file })));
+                } else {
+                    // 如果文件打开失败，只输出到 stderr
+                    builder.target(Target::Stderr);
+                }
+            } else {
+                // 没有指定文件路径，只输出到 stderr
+                builder.target(Target::Stderr);
+            }
         }
         
         builder.init();

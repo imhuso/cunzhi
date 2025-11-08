@@ -33,6 +33,14 @@ pub struct JiyiRequest {
     pub category: String,
 }
 
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AcemcpRequest {
+    #[schemars(description = "项目根目录的绝对路径，使用正斜杠(/)作为分隔符")]
+    pub project_root_path: String,
+    #[schemars(description = "用于查找相关代码上下文的自然语言搜索查询")]
+    pub query: String,
+}
+
 fn default_category() -> String {
     "context".to_string()
 }

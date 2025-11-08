@@ -108,6 +108,12 @@ pub struct ReplyConfig {
 pub struct McpConfig {
     #[serde(default = "default_mcp_tools")]
     pub tools: HashMap<String, bool>, // MCP工具启用状态
+    pub acemcp_base_url: Option<String>, // acemcp API端点URL
+    pub acemcp_token: Option<String>, // acemcp认证令牌
+    pub acemcp_batch_size: Option<u32>, // acemcp批处理大小
+    pub acemcp_max_lines_per_blob: Option<u32>, // acemcp最大行数/块
+    pub acemcp_text_extensions: Option<Vec<String>>, // acemcp文件扩展名
+    pub acemcp_exclude_patterns: Option<Vec<String>>, // acemcp排除模式
 }
 
 // 自定义prompt结构
@@ -238,6 +244,12 @@ pub fn default_audio_config() -> AudioConfig {
 pub fn default_mcp_config() -> McpConfig {
     McpConfig {
         tools: default_mcp_tools(),
+        acemcp_base_url: None,
+        acemcp_token: None,
+        acemcp_batch_size: None,
+        acemcp_max_lines_per_blob: None,
+        acemcp_text_extensions: None,
+        acemcp_exclude_patterns: None,
     }
 }
 
@@ -333,7 +345,8 @@ pub fn default_continue_prompt() -> String {
 pub fn default_mcp_tools() -> HashMap<String, bool> {
     let mut tools = HashMap::new();
     tools.insert(mcp::TOOL_ZHI.to_string(), true); // 寸止工具默认启用
-    tools.insert(mcp::TOOL_JI.to_string(), true); // 记忆管理工具默认启用
+    tools.insert(mcp::TOOL_JI.to_string(), false); // 记忆管理工具默认关闭
+    tools.insert(mcp::TOOL_SOU.to_string(), false); // 代码搜索工具默认关闭
     tools
 }
 
