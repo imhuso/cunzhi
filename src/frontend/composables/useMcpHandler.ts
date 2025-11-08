@@ -82,8 +82,12 @@ export function useMcpHandler() {
           message: request.message,
           predefinedOptions: request.predefined_options || [],
           isMarkdown: request.is_markdown || false,
+          botName: request.bot_name || null,
+          sessionId: request.session_id || null,
         })
         console.log('✅ Telegram同步启动成功')
+        console.log('  - session_id:', request.session_id)
+        console.log('  - bot_name:', request.bot_name)
       }
     }
     catch (error) {
@@ -97,12 +101,30 @@ export function useMcpHandler() {
   async function checkMcpMode() {
     try {
       const args = await invoke('get_cli_args')
+      console.log('📋 CLI args:', args)
 
       if (args && (args as any).mcp_request) {
         // 读取MCP请求文件
         const content = await invoke('read_mcp_request', { filePath: (args as any).mcp_request })
+        console.log('📄 MCP request content:', content)
 
         if (content) {
+          // 记录会话（如果有 session_id）
+          const sessionId = (content as any).session_id
+          if (sessionId) {
+            try {
+              console.log('🔄 开始记录会话:', sessionId)
+              await invoke('record_session', { sessionId })
+              console.log('✅ 会话已记录:', sessionId)
+            }
+            catch (error) {
+              console.error('❌ 记录会话失败:', error)
+            }
+          }
+          else {
+            console.warn('⚠️ 请求中没有 session_id')
+          }
+
           await showMcpDialog(content)
         }
         return { isMcp: true, mcpContent: content }

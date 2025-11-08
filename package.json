@@ -10,7 +10,8 @@
     "lint": "eslint . --fix",
     "tauri": "cargo tauri",
     "tauri:dev": "cargo tauri dev",
-    "tauri:build": "cargo tauri build",
+    "tauri:build": "cargo tauri build && ./scripts/post-build.sh",
+    "tauri:build:install": "cargo tauri build && ./scripts/post-build.sh --install",
     "test:ui": "cd src/frontend/test && vite",
     "test:ui:build": "cd src/frontend/test && vite build"
   },

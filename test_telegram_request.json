@@ -1,0 +1,11 @@
+{
+  "id": "test-telegram-integration",
+  "message": "# Telegram 集成测试\n\n这是一条测试消息，用于验证 Telegram Bot 集成是否正常工作。\n\n如果您在 Telegram 中看到这条消息，说明配置成功！",
+  "predefined_options": [
+    "配置成功 ✅",
+    "需要调整",
+    "测试其他功能"
+  ],
+  "is_markdown": true
+}
+

@@ -623,9 +623,14 @@ defineExpose({
   <div class="space-y-3">
     <!-- 预定义选项 -->
     <div v-if="!loading && hasOptions" class="space-y-3" data-guide="predefined-options">
-      <h4 class="text-sm font-medium text-white">
-        请选择选项
-      </h4>
+      <div>
+        <h4 class="text-sm font-medium text-white">
+          请选择选项
+        </h4>
+        <div v-if="request?.session_id" class="text-xs opacity-60 mt-1">
+          工作目录: {{ request.session_id }}
+        </div>
+      </div>
       <n-space vertical size="small">
         <div
           v-for="(option, index) in request!.predefined_options"
