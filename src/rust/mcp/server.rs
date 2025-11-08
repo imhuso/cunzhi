@@ -7,7 +7,7 @@ use rmcp::{
 };
 use std::collections::HashMap;
 
-use super::tools::{InteractionTool, MemoryTool};
+use super::tools::{InteractionTool, MemoryTool, AcemcpTool};
 use super::types::{ZhiRequest, JiyiRequest};
 use crate::config::load_standalone_config;
 use crate::{log_important, log_debug};
@@ -151,6 +151,11 @@ impl ServerHandler for ZhiServer {
             }
         }
 
+        // 代码搜索工具 - 仅在启用时添加
+        if self.is_tool_enabled("sou") {
+            tools.push(AcemcpTool::get_tool_definition());
+        }
+
         log_debug!("返回给客户端的工具列表: {:?}", tools.iter().map(|t| &t.name).collect::<Vec<_>>());
 
         Ok(ListToolsResult {
@@ -198,6 +203,27 @@ impl ServerHandler for ZhiServer {
 
                 // 调用记忆工具
                 MemoryTool::jiyi(ji_request).await
+            }
+            "sou" => {
+                // 检查代码搜索工具是否启用
+                if !self.is_tool_enabled("sou") {
+                    return Err(McpError::internal_error(
+                        "代码搜索工具已被禁用".to_string(),
+                        None
+                    ));
+                }
+
+                // 解析请求参数
+                let arguments_value = request.arguments
+                    .map(serde_json::Value::Object)
+                    .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+
+                // 使用acemcp模块中的AcemcpRequest类型
+                let acemcp_request: crate::mcp::tools::acemcp::types::AcemcpRequest = serde_json::from_value(arguments_value)
+                    .map_err(|e| McpError::invalid_params(format!("参数解析失败: {}", e), None))?;
+
+                // 调用代码搜索工具
+                AcemcpTool::search_context(acemcp_request).await
             }
             _ => {
                 Err(McpError::invalid_request(

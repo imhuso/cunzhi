@@ -203,5 +203,11 @@ export default defineConfig({
     'i-carbon-download',
     'i-carbon-pin',
     'i-carbon-pin-filled',
+    'i-carbon-search',
+    'i-carbon-connection-signal',
+    'i-carbon-activity',
+    'i-carbon-settings-adjust',
+    'i-carbon-trash-can',
+    'i-carbon-document-text',
   ],
 })

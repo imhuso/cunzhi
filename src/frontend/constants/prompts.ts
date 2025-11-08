@@ -42,6 +42,12 @@ export const PROMPT_SECTIONS = {
 - 使用 \`记忆\` 的 add 功能添加新记忆（content + category: rule/preference/pattern/context）
 - 仅在重要变更时更新记忆，保持简洁`,
   } as PromptSection,
+
+  // 代码搜索工具提示词
+  sou: {
+    base: ``,
+    detail: `代码搜索工具：如果需要查找/搜索代码，优先使用 \`sou\` 工具查询`,
+  } as PromptSection,
 }
 
 // 默认MCP工具配置
@@ -65,6 +71,16 @@ export const DEFAULT_MCP_TOOLS: MCPToolConfig[] = [
     icon: 'i-carbon-data-base text-lg text-purple-600 dark:text-purple-400',
     iconBg: 'bg-purple-100',
     darkIconBg: 'dark:bg-purple-900',
+  },
+  {
+    id: 'sou',
+    name: '代码搜索工具',
+    description: '基于查询在特定项目中搜索相关的代码上下文，支持语义搜索和增量索引',
+    enabled: false,
+    canDisable: true,
+    icon: 'i-carbon-search text-lg text-green-600 dark:text-green-400',
+    iconBg: 'bg-green-100',
+    darkIconBg: 'dark:bg-green-900',
   },
 ]
 
