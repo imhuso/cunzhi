@@ -11,6 +11,7 @@ export interface MCPToolConfig {
   icon: string
   icon_bg: string
   dark_icon_bg: string
+  has_config?: boolean
 }
 
 // 全局MCP工具状态

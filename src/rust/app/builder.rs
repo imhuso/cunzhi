@@ -71,6 +71,15 @@ pub fn build_tauri_app() -> Builder<tauri::Wry> {
             build_mcp_send_response,
             build_mcp_continue_response,
             create_test_popup,
+            
+            // acemcp命令（迁移至 tools::acemcp::commands）
+            crate::mcp::tools::acemcp::commands::get_acemcp_config,
+            crate::mcp::tools::acemcp::commands::save_acemcp_config,
+            crate::mcp::tools::acemcp::commands::test_acemcp_connection,
+            crate::mcp::tools::acemcp::commands::read_acemcp_logs,
+            crate::mcp::tools::acemcp::commands::clear_acemcp_cache,
+            crate::mcp::tools::acemcp::commands::debug_acemcp_search,
+            crate::mcp::tools::acemcp::commands::execute_acemcp_tool,
 
             // 自定义prompt命令
             get_custom_prompt_config,

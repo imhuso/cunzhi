@@ -73,6 +73,7 @@ src-tauri/Cargo.lock
 *.app/
 
 # scripts
+temp/
 scripts/
 *.exe
 *.md
