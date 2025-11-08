@@ -102,6 +102,10 @@ impl ServerHandler for ZhiServer {
                 "is_markdown": {
                     "type": "boolean",
                     "description": "消息是否为Markdown格式，默认为true"
+                },
+                "working_directory": {
+                    "type": "string",
+                    "description": "当前工作目录（可选），用于会话识别。AI应该传递当前项目的根目录路径"
                 }
             },
             "required": ["message"]
@@ -177,6 +181,10 @@ impl ServerHandler for ZhiServer {
                 let arguments_value = request.arguments
                     .map(serde_json::Value::Object)
                     .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+
+                // 调试：记录原始参数
+                log_important!(info, "🔍 MCP 服务器收到 zhi 请求");
+                log_important!(info, "🔍 原始参数: {}", serde_json::to_string_pretty(&arguments_value).unwrap_or_default());
 
                 let zhi_request: ZhiRequest = serde_json::from_value(arguments_value)
                     .map_err(|e| McpError::invalid_params(format!("参数解析失败: {}", e), None))?;

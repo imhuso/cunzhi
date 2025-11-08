@@ -176,18 +176,164 @@ pub struct ShortcutKey {
     pub meta: bool, // macOS的Cmd键
 }
 
+// 单个 Telegram Bot 配置
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TelegramBotConfig {
+    pub name: String, // Bot 名称/标识
+    pub bot_token: String, // Bot Token
+    pub chat_id: String, // Chat ID
+    #[serde(default = "default_telegram_api_base_url")]
+    pub api_base_url: String, // Telegram API基础URL
+}
+
+// Telegram 总配置（支持多个 Bot）
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TelegramConfig {
     #[serde(default = "default_telegram_enabled")]
     pub enabled: bool, // 是否启用Telegram Bot
-    #[serde(default = "default_telegram_bot_token")]
-    pub bot_token: String, // Bot Token
-    #[serde(default = "default_telegram_chat_id")]
-    pub chat_id: String, // Chat ID
     #[serde(default = "default_telegram_hide_frontend_popup")]
     pub hide_frontend_popup: bool, // 是否隐藏前端弹窗，仅使用Telegram交互
-    #[serde(default = "default_telegram_api_base_url")]
-    pub api_base_url: String, // Telegram API基础URL
+    #[serde(default = "default_telegram_bots")]
+    pub bots: Vec<TelegramBotConfig>, // Bot 列表
+    #[serde(default = "default_telegram_default_bot")]
+    pub default_bot: String, // 默认使用的 Bot 名称
+    #[serde(default = "default_telegram_session_bot_mapping")]
+    pub session_bot_mapping: HashMap<String, String>, // 会话 ID -> Bot 名称的映射
+    #[serde(default = "default_telegram_pending_sessions")]
+    pub pending_sessions: Vec<PendingSession>, // 待配置的会话列表
+
+    // 旧版本兼容字段（用于自动迁移）
+    #[serde(skip_serializing, default)]
+    pub bot_token: Option<String>,
+    #[serde(skip_serializing, default)]
+    pub chat_id: Option<String>,
+    #[serde(skip_serializing, default)]
+    pub api_base_url: Option<String>,
+}
+
+// 待配置的会话信息
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PendingSession {
+    pub session_id: String,
+    pub first_seen: String, // ISO 8601 时间戳
+    pub last_seen: String,  // ISO 8601 时间戳
+    pub request_count: u32, // 请求次数
+}
+
+impl TelegramConfig {
+    /// 获取指定名称的 Bot 配置
+    pub fn get_bot(&self, name: &str) -> Option<&TelegramBotConfig> {
+        self.bots.iter().find(|bot| bot.name == name)
+    }
+
+    /// 获取默认 Bot 配置
+    pub fn get_default_bot(&self) -> Option<&TelegramBotConfig> {
+        if self.default_bot.is_empty() {
+            self.bots.first()
+        } else {
+            self.get_bot(&self.default_bot)
+        }
+    }
+
+    /// 根据会话 ID 获取对应的 Bot 配置
+    /// 如果会话有映射，使用映射的 bot；否则使用默认 bot
+    pub fn get_bot_for_session(&self, session_id: Option<&str>) -> Option<&TelegramBotConfig> {
+        if let Some(sid) = session_id {
+            if let Some(bot_name) = self.session_bot_mapping.get(sid) {
+                if let Some(bot) = self.get_bot(bot_name) {
+                    return Some(bot);
+                }
+            }
+        }
+        self.get_default_bot()
+    }
+
+    /// 设置会话到 Bot 的映射
+    pub fn set_session_bot_mapping(&mut self, session_id: String, bot_name: String) {
+        self.session_bot_mapping.insert(session_id, bot_name);
+    }
+
+    /// 删除会话到 Bot 的映射
+    pub fn remove_session_bot_mapping(&mut self, session_id: &str) -> bool {
+        self.session_bot_mapping.remove(session_id).is_some()
+    }
+
+    /// 记录新的会话请求
+    pub fn record_session_request(&mut self, session_id: &str) {
+        // 如果已经有映射，不需要记录
+        if self.session_bot_mapping.contains_key(session_id) {
+            return;
+        }
+
+        // 查找是否已经在待配置列表中
+        if let Some(pending) = self.pending_sessions.iter_mut().find(|p| p.session_id == session_id) {
+            // 更新最后访问时间和请求次数
+            pending.last_seen = chrono::Utc::now().to_rfc3339();
+            pending.request_count += 1;
+        } else {
+            // 添加新的待配置会话
+            let now = chrono::Utc::now().to_rfc3339();
+            self.pending_sessions.push(PendingSession {
+                session_id: session_id.to_string(),
+                first_seen: now.clone(),
+                last_seen: now,
+                request_count: 1,
+            });
+        }
+    }
+
+    /// 移除待配置会话（当配置完成后）
+    pub fn remove_pending_session(&mut self, session_id: &str) {
+        self.pending_sessions.retain(|p| p.session_id != session_id);
+    }
+
+    /// 添加 Bot 配置
+    pub fn add_bot(&mut self, bot: TelegramBotConfig) {
+        // 如果是第一个 bot，设置为默认
+        if self.bots.is_empty() {
+            self.default_bot = bot.name.clone();
+        }
+        self.bots.push(bot);
+    }
+
+    /// 删除 Bot 配置
+    pub fn remove_bot(&mut self, name: &str) -> bool {
+        if let Some(pos) = self.bots.iter().position(|bot| bot.name == name) {
+            self.bots.remove(pos);
+            // 如果删除的是默认 bot，重新设置默认
+            if self.default_bot == name {
+                self.default_bot = self.bots.first()
+                    .map(|bot| bot.name.clone())
+                    .unwrap_or_default();
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 从旧版本配置迁移
+    pub fn migrate_from_legacy(&mut self) {
+        // 如果存在旧版本字段且 bots 为空，则迁移
+        if self.bots.is_empty() {
+            if let (Some(token), Some(chat_id)) = (&self.bot_token, &self.chat_id) {
+                if !token.is_empty() && !chat_id.is_empty() {
+                    let legacy_bot = TelegramBotConfig {
+                        name: "默认Bot".to_string(),
+                        bot_token: token.clone(),
+                        chat_id: chat_id.clone(),
+                        api_base_url: self.api_base_url.clone()
+                            .unwrap_or_else(|| telegram::API_BASE_URL.to_string()),
+                    };
+                    self.add_bot(legacy_bot);
+                }
+            }
+        }
+        // 清除旧字段
+        self.bot_token = None;
+        self.chat_id = None;
+        self.api_base_url = None;
+    }
 }
 
 #[derive(Debug)]
@@ -256,11 +402,32 @@ pub fn default_mcp_config() -> McpConfig {
 pub fn default_telegram_config() -> TelegramConfig {
     TelegramConfig {
         enabled: default_telegram_enabled(),
-        bot_token: default_telegram_bot_token(),
-        chat_id: default_telegram_chat_id(),
         hide_frontend_popup: default_telegram_hide_frontend_popup(),
-        api_base_url: default_telegram_api_base_url(),
+        bots: default_telegram_bots(),
+        default_bot: default_telegram_default_bot(),
+        session_bot_mapping: default_telegram_session_bot_mapping(),
+        pending_sessions: default_telegram_pending_sessions(),
+        // 旧版本兼容字段
+        bot_token: None,
+        chat_id: None,
+        api_base_url: None,
     }
+}
+
+pub fn default_telegram_bots() -> Vec<TelegramBotConfig> {
+    vec![]
+}
+
+pub fn default_telegram_default_bot() -> String {
+    String::new()
+}
+
+pub fn default_telegram_session_bot_mapping() -> HashMap<String, String> {
+    HashMap::new()
+}
+
+pub fn default_telegram_pending_sessions() -> Vec<PendingSession> {
+    vec![]
 }
 
 pub fn default_custom_prompt_config() -> CustomPromptConfig {

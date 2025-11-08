@@ -5,6 +5,8 @@ export interface McpRequest {
   message: string
   predefined_options?: string[]
   is_markdown?: boolean
+  session_id?: string
+  bot_name?: string
 }
 
 // 自定义prompt类型定义

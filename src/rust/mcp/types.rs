@@ -1,7 +1,7 @@
 use chrono;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ZhiRequest {
     #[schemars(description = "要显示给用户的消息")]
     pub message: String,
@@ -11,6 +11,9 @@ pub struct ZhiRequest {
     #[schemars(description = "消息是否为Markdown格式，默认为true")]
     #[serde(default = "default_is_markdown")]
     pub is_markdown: bool,
+    #[schemars(description = "当前工作目录（强烈建议传递），用于会话识别和多Bot路由。格式：path:branch（例如：/Users/username/project:main）或 path（非Git仓库）。AI应该先获取当前Git分支（使用 git branch --show-current），然后构建 'path:branch' 格式的working_directory。如果不是Git仓库或无法获取分支，则只传递路径。这样可以确保同一目录的不同分支使用不同的Bot。")]
+    #[serde(default)]
+    pub working_directory: Option<String>,
 }
 
 fn default_is_markdown() -> bool {
@@ -51,6 +54,10 @@ pub struct PopupRequest {
     pub message: String,
     pub predefined_options: Option<Vec<String>>,
     pub is_markdown: bool,
+    #[serde(default)]
+    pub bot_name: Option<String>, // 可选的 Telegram Bot 名称
+    #[serde(default)]
+    pub session_id: Option<String>, // 可选的会话 ID，用于自动选择 bot
 }
 
 /// 新的结构化响应数据格式

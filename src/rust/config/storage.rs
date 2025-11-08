@@ -48,11 +48,23 @@ pub async fn load_config(state: &State<'_, AppState>, app: &AppHandle) -> Result
         // 合并默认快捷键配置，确保新的默认快捷键被添加
         merge_default_shortcuts(&mut config);
 
-        let mut config_guard = state
-            .config
-            .lock()
-            .map_err(|e| anyhow::anyhow!("获取配置锁失败: {}", e))?;
-        *config_guard = config;
+        // 迁移旧版本 Telegram 配置
+        let needs_save = config.telegram_config.bot_token.is_some() ||
+                        config.telegram_config.chat_id.is_some();
+        config.telegram_config.migrate_from_legacy();
+
+        {
+            let mut config_guard = state
+                .config
+                .lock()
+                .map_err(|e| anyhow::anyhow!("获取配置锁失败: {}", e))?;
+            *config_guard = config;
+        } // config_guard 在这里被释放
+
+        // 如果进行了迁移，保存配置
+        if needs_save {
+            save_config(state, app).await?;
+        }
     }
 
     Ok(())
@@ -130,11 +142,38 @@ pub fn load_standalone_config() -> Result<AppConfig> {
         // 合并默认快捷键配置
         merge_default_shortcuts(&mut config);
 
+        // 迁移旧版本 Telegram 配置
+        config.telegram_config.migrate_from_legacy();
+
         Ok(config)
     } else {
         // 如果配置文件不存在，返回默认配置
         Ok(AppConfig::default())
     }
+}
+
+/// 独立保存配置文件（用于MCP服务器等独立进程）
+pub fn save_standalone_config(config: &AppConfig) -> Result<()> {
+    let config_path = get_standalone_config_path()?;
+
+    // 确保目录存在
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let config_json = serde_json::to_string_pretty(config)?;
+
+    // 写入文件
+    fs::write(&config_path, config_json)?;
+
+    // 强制刷新文件系统缓存
+    if let Ok(file) = std::fs::OpenOptions::new().write(true).open(&config_path) {
+        let _ = file.sync_all();
+    }
+
+    log::debug!("配置已保存到: {:?}", config_path);
+
+    Ok(())
 }
 
 /// 独立加载Telegram配置（用于MCP模式下的配置检查）

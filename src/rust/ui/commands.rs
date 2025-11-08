@@ -426,6 +426,8 @@ pub fn get_cli_args() -> Result<serde_json::Value, String> {
 
 #[tauri::command]
 pub fn read_mcp_request(file_path: String) -> Result<serde_json::Value, String> {
+    use crate::log_important;
+
     if !std::path::Path::new(&file_path).exists() {
         return Err(format!("文件不存在: {}", file_path));
     }
@@ -435,8 +437,32 @@ pub fn read_mcp_request(file_path: String) -> Result<serde_json::Value, String> 
             if content.trim().is_empty() {
                 return Err("文件内容为空".to_string());
             }
-            match serde_json::from_str(&content) {
-                Ok(json) => Ok(json),
+            match serde_json::from_str::<serde_json::Value>(&content) {
+                Ok(mut json) => {
+                    // 如果 session_id 为空或不存在，尝试从环境变量或当前目录获取
+                    if let Some(obj) = json.as_object_mut() {
+                        let session_id = obj.get("session_id")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| !s.is_empty() && !s.starts_with("session_"));
+
+                        if session_id.is_none() {
+                            // 尝试获取工作目录
+                            let working_dir = std::env::var("PWD").ok()
+                                .or_else(|| std::env::current_dir().ok().and_then(|p| p.to_str().map(|s| s.to_string())))
+                                .map(|s| s.trim_end_matches('/').to_string());
+
+                            if let Some(dir) = working_dir {
+                                log_important!(info, "🔍 GUI 自动获取工作目录: {}", dir);
+                                obj.insert("session_id".to_string(), serde_json::Value::String(dir));
+                            } else {
+                                log_important!(warn, "⚠️ 无法获取工作目录");
+                            }
+                        } else {
+                            log_important!(info, "✅ 使用 MCP 传递的 session_id: {:?}", session_id);
+                        }
+                    }
+                    Ok(json)
+                }
                 Err(e) => Err(format!("解析JSON失败: {}", e)),
             }
         }
